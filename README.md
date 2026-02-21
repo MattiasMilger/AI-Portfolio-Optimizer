@@ -90,8 +90,8 @@ The app is a linear wizard. Each step has a **← Back** button so you can revis
 | 1 | **Title** | Click *Optimize Portfolio* to begin |
 | 2 | **Source** | Choose *Upload Image* (screenshot scan) or *Start from Scratch* (manual entry) |
 | 3 | **Positions** | Review, edit, add, or delete the extracted/entered positions |
-| 4 | **Suggest New Stocks?** | Tick if you want the AI to recommend new tickers (only shown when you have existing positions) |
-| 5 | **Investment Preferences** | Enter target industries and target countries (both optional, both saveable as defaults) |
+| 4 | **Suggest New Assets?** | Tick if you want the AI to recommend new assets (only shown when you have existing positions) |
+| 5 | **Investment Preferences** | Enter target industries, target countries, and preferred asset types (all optional, all saveable as defaults) |
 | 6 | **Risk Profile** | Choose Conservative, Moderate, or Aggressive |
 | 7 | **Budget & Currency** | Set your base currency and any additional cash available for new purchases |
 | 8 | **AI Model** | Pick the Gemini model to use |
@@ -159,7 +159,7 @@ All wizard pages are instantiated once at startup and stacked in the same grid c
 
 ### Persistent state
 
-The only data persisted between sessions is `data/defaults.json`, which stores the user's saved Target Industries and Target Countries strings. Nothing else is written to disk unless the user explicitly clicks Save on the results page.
+The only data persisted between sessions is `data/defaults.json`, which stores the user's saved Target Industries, Target Countries, and Asset Types strings. Nothing else is written to disk unless the user explicitly clicks Save on the results page.
 
 ---
 
@@ -175,7 +175,7 @@ AI Portfolio Optimizer/
 ├── .env                     # Your API key (not committed to git)
 │
 ├── data/
-│   └── defaults.json        # Saved industry/country preferences (auto-created)
+│   └── defaults.json        # Saved industry/country/asset-type preferences (auto-created)
 │
 └── reports/
     └── YYYY-MM-DD.txt       # Saved AI recommendation outputs (auto-created)
@@ -191,7 +191,7 @@ AI Portfolio Optimizer/
 | `SourcePage` | Upload image or start from scratch |
 | `PositionsPage` | Editable position list with add/delete rows |
 | `RecModePage` | Toggle for recommending new stocks |
-| `IndustriesPage` | Target industries + countries with persistent defaults |
+| `IndustriesPage` | Target industries, countries, and asset types with persistent defaults |
 | `RiskProfilePage` | Conservative / Moderate / Aggressive radio selection |
 | `BudgetPage` | Base currency (freeform combobox) + cash budget |
 | `ModelPage` | Gemini model picker |
@@ -211,6 +211,6 @@ AI Portfolio Optimizer/
 
 ## Credits
 
-**Developer:** Mattias Milger
-**Email:** mattias.r.milger@gmail.com
-**GitHub:** [MattiasMilger](https://github.com/MattiasMilger)
+**Developer**: Mattias Milger  
+**Email**: mattias.r.milger@gmail.com  
+**GitHub**: [MattiasMilger](https://github.com/MattiasMilger/Vasenvaktaren)

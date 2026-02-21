@@ -394,7 +394,7 @@ class RecModePage(WizardPage):
         self.grid_rowconfigure(1, weight=1)
         self.grid_columnconfigure(0, weight=1)
 
-        _label(self, "Suggest New Stocks?",
+        _label(self, "Suggest New Assets?",
                font=FONT_HEADING, anchor="center").grid(
                row=0, column=0, pady=(60, 20))
 
@@ -404,7 +404,7 @@ class RecModePage(WizardPage):
         self._var = ctk.BooleanVar(value=False)
         ctk.CTkCheckBox(
             center,
-            text="Yes — recommend new stocks or ETFs to add to my portfolio",
+            text="Yes — recommend new assets to add to my portfolio",
             variable=self._var, font=FONT_BODY,
         ).pack(pady=8)
 
@@ -495,6 +495,15 @@ class IndustriesPage(WizardPage):
         self._ctr_save.configure(command=lambda: self._save_field(
             "countries", self._ctr_txt, self._ctr_save))
 
+        self._ast_txt, self._ast_save = _pref_block(
+            inner,
+            "Asset Types",
+            "Types of assets you prefer, e.g. Stocks, ETF, Bonds, REITs "
+            "(optional, treated as a soft preference).",
+        )
+        self._ast_save.configure(command=lambda: self._save_field(
+            "asset_types", self._ast_txt, self._ast_save))
+
         footer = ctk.CTkFrame(self, fg_color="transparent")
         footer.grid(row=2, column=0, sticky="ew", padx=24, pady=14)
         footer.grid_columnconfigure(1, weight=1)
@@ -504,7 +513,11 @@ class IndustriesPage(WizardPage):
 
     def on_show(self):
         defaults = _load_defaults()
-        for key, txt in [("industries", self._ind_txt), ("countries", self._ctr_txt)]:
+        for key, txt in [
+            ("industries", self._ind_txt),
+            ("countries", self._ctr_txt),
+            ("asset_types", self._ast_txt),
+        ]:
             txt.delete("1.0", "end")
             value = self.app.session.get(key)
             if value is None:
@@ -521,8 +534,9 @@ class IndustriesPage(WizardPage):
                                                fg_color=COLOR_ACCENT))
 
     def _continue(self):
-        self.app.session["industries"] = self._ind_txt.get("1.0", "end").strip()
-        self.app.session["countries"]  = self._ctr_txt.get("1.0", "end").strip()
+        self.app.session["industries"]  = self._ind_txt.get("1.0", "end").strip()
+        self.app.session["countries"]   = self._ctr_txt.get("1.0", "end").strip()
+        self.app.session["asset_types"] = self._ast_txt.get("1.0", "end").strip()
         self.app.goto("riskprofile")
 
 
@@ -769,6 +783,7 @@ class ResultPage(WizardPage):
         base_cur     = s.get("base_currency", "SEK")
         industries   = s.get("industries", "")
         countries    = s.get("countries", "")
+        asset_types  = s.get("asset_types", "")
         risk_profile = s.get("risk_profile", "Moderate")
         budget       = s.get("budget", 0.0)
         rec_new      = s.get("rec_new_stocks", False)
@@ -786,6 +801,7 @@ class ResultPage(WizardPage):
             enriched_portfolio=enriched,
             industries=industries,
             countries=countries,
+            asset_types=asset_types,
             risk_profile=risk_profile,
             budget=budget,
             base_currency=base_cur,

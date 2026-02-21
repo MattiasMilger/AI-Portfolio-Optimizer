@@ -26,6 +26,13 @@ def _client() -> genai.Client:
     return genai.Client(api_key=_GEMINI_API_KEY)
 
 
+def _fmt_num(value: float) -> str:
+    """Format a number cleanly: integer if whole, otherwise strip trailing zeros."""
+    if value == int(value):
+        return str(int(value))
+    return f"{value:.4f}".rstrip("0")
+
+
 # ---------------------------------------------------------------------------
 # Market data helpers
 # ---------------------------------------------------------------------------
@@ -312,6 +319,7 @@ def get_optimizer_recommendation(
     budget: float,
     base_currency: str,
     countries: str = "",
+    asset_types: str = "",
     risk_profile: str = "Moderate",
     rec_new_stocks: bool = False,
     preferred_model: str = "gemini-2.5-flash",
@@ -346,9 +354,9 @@ def get_optimizer_recommendation(
             company = p.get("company_name") or p["ticker"]
             holdings_lines.append(
                 f"  • {company} ({p['ticker']})  "
-                f"qty={p['quantity']:.4f}  "
-                f"avg_cost={p['avg_buy_price']:.4f} {p['original_currency']}  "
-                f"price={p['current_price_base']:.4f} {base_currency}  "
+                f"qty={_fmt_num(p['quantity'])}  "
+                f"avg_cost={_fmt_num(p['avg_buy_price'])} {p['original_currency']}  "
+                f"price={_fmt_num(p['current_price_base'])} {base_currency}  "
                 f"value={p['current_value_base']:.2f} {base_currency}  "
                 f"P/L={p['pl_pct']:+.2f}% ({p['pl_abs']:+.2f} {base_currency})"
                 f"{stale}"
@@ -375,6 +383,7 @@ PORTFOLIO SNAPSHOT
 Risk Profile      : {risk_profile}
 Target Industries : {industries or 'No preference'}
 Target Countries  : {countries or 'No preference'}
+Asset Types       : {asset_types or 'No preference'}
 Base Currency     : {base_currency}
 
 CURRENT HOLDINGS ({num_positions} position(s)):
@@ -388,39 +397,54 @@ BUDGET:
 {budget_text}
 """.strip()
 
+    asset_types_clause = (
+        f"Preferred asset types are: {asset_types}. Respect this when choosing what to buy or suggest — "
+        "only recommend other asset types if no suitable match exists. "
+        if asset_types else ""
+    )
     new_stocks_section = (
-        "Also suggest 2-3 NEW stocks or ETFs not currently held that fit the target industries "
-        "and can be purchased within the stated budget, each with ticker and one-line rationale.\n"
+        f"Also suggest 2-3 NEW assets not currently held that fit the target industries{' and preferred asset types' if asset_types else ''}. "
+        "Each suggestion must include a specific whole number of shares that can be purchased within the stated budget, "
+        "plus a ticker and one-line rationale.\n"
         if rec_new_stocks and num_positions > 0
         else (
-            "The portfolio is empty — suggest 3-5 starter positions that fit the target industries "
-            "and can be purchased within the stated budget, each with ticker and one-line rationale.\n"
+            f"The portfolio is empty — suggest 3-5 starter assets that fit the target industries{' and preferred asset types' if asset_types else ''}. "
+            "Each suggestion must include a specific whole number of shares that can be purchased within the stated budget, "
+            "plus a ticker and one-line rationale.\n"
             if num_positions == 0
             else ""
         )
     )
 
     countries_clause = (
-        f"Prefer stocks listed or headquartered in: {countries}. "
+        f"Prefer assets listed or headquartered in: {countries}. "
         if countries else ""
     )
     system_instruction = (
         "You are a financial analyst. "
         f"The investor's risk profile is {risk_profile}. "
         f"{countries_clause}"
+        f"{asset_types_clause}"
         "Use ONLY the signals SELL, BUY, and HOLD — never 'add', 'reduce', or any other word. "
         "Be balanced: default to HOLD unless there is a concrete, specific reason to act. "
-        "If you recommend a SELL, you must pair it with a BUY for the proceeds. "
+        "If you recommend a SELL, use the proceeds for a BUY of a DIFFERENT security — "
+        "never sell a position only to rebuy the same ticker. "
+        "For every SELL and BUY you must state a specific whole number of shares — "
+        "calculate it from the prices and budget in the report. "
+        "Never use vague language like 'some', 'a portion', 'a few', or a range. "
+        "The total cost of all BUYs must not exceed the sum of all SELL proceeds plus the additional cash budget. "
+        "Choose quantities so that cash in (sells + budget) equals cash out (buys) as closely as possible. "
         f"{new_stocks_section}"
         "End your response with exactly this block. "
         "Order: all SELLs first, then all BUYs, then all HOLDs. "
         "Each SELL and BUY line must end with ' — ' followed by a one-line reason. "
+        "Every position not being sold must appear as a HOLD line — never list a ticker without the Hold keyword. "
         "HOLD lines have no reason. "
         "Use the full company name exactly as in the holdings data.\n\n"
         "MY RECOMMENDATION\n"
         "-----------------\n"
-        "Sell X share(s) of Full Company Name (TICKER) — reason\n"
-        "Buy X share(s) of Full Company Name (TICKER) — reason\n"
+        "Sell 3 share(s) of Full Company Name (TICKER) — reason\n"
+        "Buy 5 share(s) of Full Company Name (TICKER) — reason\n"
         "Hold Full Company Name (TICKER)\n\n"
         "[One concise paragraph: overall strategic rationale and key risk]\n\n"
         "No introductions, no disclaimers, no fluff. "
