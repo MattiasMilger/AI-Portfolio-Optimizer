@@ -734,6 +734,7 @@ class ResultPage(WizardPage):
         self.grid_rowconfigure(1, weight=1)
         self.grid_columnconfigure(0, weight=1)
 
+        # --- Header ---
         hdr = ctk.CTkFrame(self, fg_color="transparent")
         hdr.grid(row=0, column=0, sticky="ew", padx=24, pady=(20, 4))
         hdr.grid_columnconfigure(1, weight=1)
@@ -741,6 +742,7 @@ class ResultPage(WizardPage):
         self._status_lbl = _label(hdr, "", font=FONT_SMALL, text_color=COLOR_MUTED)
         self._status_lbl.grid(row=0, column=1, sticky="e", padx=8)
 
+        # --- Recommendation textbox ---
         self._textbox = ctk.CTkTextbox(
             self, font=FONT_MONO, wrap="word",
             fg_color=COLOR_PANEL, corner_radius=8,
@@ -748,8 +750,42 @@ class ResultPage(WizardPage):
         self._textbox.grid(row=1, column=0, sticky="nsew", padx=24, pady=4)
         self._textbox.configure(state="disabled")
 
+        # --- Chat section ---
+        chat_hdr = ctk.CTkFrame(self, fg_color="transparent")
+        chat_hdr.grid(row=2, column=0, sticky="ew", padx=24, pady=(6, 2))
+        _label(chat_hdr, "Discuss with AI", font=FONT_SMALL, text_color=COLOR_MUTED).pack(side="left")
+
+        self._chat_box = ctk.CTkTextbox(
+            self, font=FONT_BODY, wrap="word",
+            fg_color=COLOR_PANEL, corner_radius=8,
+            height=140,
+        )
+        self._chat_box.grid(row=3, column=0, sticky="ew", padx=24, pady=(0, 4))
+        self._chat_box.configure(state="disabled")
+        self._chat_box._textbox.tag_configure("user_lbl", foreground="#7eb8f7", font=("Segoe UI", 12, "bold"))
+        self._chat_box._textbox.tag_configure("user_txt", foreground="#cce0ff")
+        self._chat_box._textbox.tag_configure("ai_lbl",   foreground="#a8e6a3", font=("Segoe UI", 12, "bold"))
+        self._chat_box._textbox.tag_configure("ai_txt",   foreground="#eaeaea")
+
+        chat_input = ctk.CTkFrame(self, fg_color="transparent")
+        chat_input.grid(row=4, column=0, sticky="ew", padx=24, pady=(0, 4))
+        chat_input.grid_columnconfigure(0, weight=1)
+
+        self._chat_entry = ctk.CTkEntry(
+            chat_input,
+            placeholder_text="Ask about the recommendations… e.g. 'I'd rather keep AAPL, what else could I sell?'",
+            font=FONT_BODY, height=36,
+        )
+        self._chat_entry.grid(row=0, column=0, sticky="ew", padx=(0, 8))
+        self._chat_entry.bind("<Return>", lambda _: self._send_chat())
+        self._chat_entry.configure(state="disabled")
+
+        self._send_btn = _btn(chat_input, "Send", command=self._send_chat, width=80, state="disabled")
+        self._send_btn.grid(row=0, column=1)
+
+        # --- Footer ---
         footer = ctk.CTkFrame(self, fg_color="transparent")
-        footer.grid(row=2, column=0, sticky="ew", padx=24, pady=14)
+        footer.grid(row=5, column=0, sticky="ew", padx=24, pady=14)
 
         self._save_btn = _btn(footer, "💾  Save", command=self._save,
                                width=110, state="disabled")
@@ -762,16 +798,23 @@ class ResultPage(WizardPage):
         _btn(footer, "↺  Restart", command=self.app.restart,
              width=110, fg_color="#3a2020", hover_color="#5a3030").pack(side="right")
 
+        # Internal chat state
+        self._situation_report: str = ""
+        self._initial_recommendation: str = ""
+        self._chat_history: list[dict] = []
+
     def on_show(self):
         self._set_text("")
         self._status_lbl.configure(text="Fetching live prices…")
         self._save_btn.configure(state="disabled")
         self._rethink_btn.configure(state="disabled")
+        self._clear_chat()
         threading.Thread(target=self._run_analysis, daemon=True).start()
 
     def on_reset(self):
         self._set_text("")
         self._status_lbl.configure(text="")
+        self._clear_chat()
 
     # ------------------------------------------------------------------
     # Analysis pipeline
@@ -796,6 +839,16 @@ class ResultPage(WizardPage):
             self.after(0, lambda: self._show_error(f"Price fetch error: {exc}"))
             return
 
+        self._situation_report = fe.build_situation_report(
+            enriched_portfolio=enriched,
+            industries=industries,
+            budget=budget,
+            base_currency=base_cur,
+            countries=countries,
+            asset_types=asset_types,
+            risk_profile=risk_profile,
+        )
+
         self.after(0, lambda: self._status_lbl.configure(text="Asking AI…"))
         result = fe.get_optimizer_recommendation(
             enriched_portfolio=enriched,
@@ -812,9 +865,13 @@ class ResultPage(WizardPage):
 
     def _show_result(self, text: str):
         self._set_text(text)
+        self._initial_recommendation = text
         self._status_lbl.configure(text="Done.")
         self._save_btn.configure(state="normal")
         self._rethink_btn.configure(state="normal")
+        self._chat_entry.configure(state="normal")
+        self._send_btn.configure(state="normal")
+        self._append_chat_msg("ai", "Analysis complete. Ask me anything about the recommendations above.")
 
     def _show_error(self, msg: str):
         self._set_text(f"Error:\n\n{msg}")
@@ -827,6 +884,63 @@ class ResultPage(WizardPage):
         if text:
             self._textbox.insert("1.0", text)
         self._textbox.configure(state="disabled")
+
+    # ------------------------------------------------------------------
+    # Chat helpers
+    # ------------------------------------------------------------------
+
+    def _clear_chat(self):
+        self._chat_history = []
+        self._initial_recommendation = ""
+        self._situation_report = ""
+        self._chat_box.configure(state="normal")
+        self._chat_box.delete("1.0", "end")
+        self._chat_box.configure(state="disabled")
+        self._chat_entry.configure(state="disabled")
+        self._send_btn.configure(state="disabled")
+
+    def _append_chat_msg(self, role: str, text: str):
+        self._chat_box.configure(state="normal")
+        existing = self._chat_box._textbox.get("1.0", "end-1c")
+        if existing:
+            self._chat_box._textbox.insert("end", "\n")
+        if role == "user":
+            self._chat_box._textbox.insert("end", "You\n", "user_lbl")
+            self._chat_box._textbox.insert("end", text + "\n", "user_txt")
+        else:
+            self._chat_box._textbox.insert("end", "AI\n", "ai_lbl")
+            self._chat_box._textbox.insert("end", text + "\n", "ai_txt")
+        self._chat_box.configure(state="disabled")
+        self._chat_box._textbox.see("end")
+
+    def _send_chat(self):
+        msg = self._chat_entry.get().strip()
+        if not msg or not self._situation_report:
+            return
+        model = self.app.session.get("model", "gemini-2.5-flash")
+        self._chat_entry.delete(0, "end")
+        self._chat_entry.configure(state="disabled")
+        self._send_btn.configure(state="disabled")
+        self._append_chat_msg("user", msg)
+        threading.Thread(target=self._run_chat, args=(msg, model), daemon=True).start()
+
+    def _run_chat(self, user_message: str, model: str):
+        reply = fe.chat_about_recommendation(
+            situation_report=self._situation_report,
+            initial_recommendation=self._initial_recommendation,
+            chat_history=self._chat_history,
+            user_message=user_message,
+            preferred_model=model,
+        )
+        self._chat_history.append({"role": "user", "text": user_message})
+        self._chat_history.append({"role": "model", "text": reply})
+        self.after(0, lambda: self._on_chat_reply(reply))
+
+    def _on_chat_reply(self, reply: str):
+        self._append_chat_msg("ai", reply)
+        self._chat_entry.configure(state="normal")
+        self._send_btn.configure(state="normal")
+        self._chat_entry.focus()
 
     # ------------------------------------------------------------------
     # Button actions
@@ -855,6 +969,7 @@ class ResultPage(WizardPage):
         self._rethink_btn.configure(state="disabled")
         self._set_text("")
         self._status_lbl.configure(text="Retrying…")
+        self._clear_chat()
         threading.Thread(target=self._run_analysis, daemon=True).start()
 
 

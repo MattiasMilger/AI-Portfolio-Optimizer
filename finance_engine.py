@@ -303,6 +303,67 @@ def scan_portfolio_image(
 # Optimizer AI recommendation (no DB, direct params)
 # ---------------------------------------------------------------------------
 
+
+def build_situation_report(
+    enriched_portfolio: list[dict],
+    industries: str,
+    budget: float,
+    base_currency: str,
+    countries: str = "",
+    asset_types: str = "",
+    risk_profile: str = "Moderate",
+) -> str:
+    """Build the text situation report from enriched portfolio data."""
+    if enriched_portfolio:
+        holdings_lines = []
+        for p in enriched_portfolio:
+            stale = " [STALE — no live price]" if not p.get("fetch_ok") else ""
+            company = p.get("company_name") or p["ticker"]
+            holdings_lines.append(
+                f"  • {company} ({p['ticker']})  "
+                f"qty={_fmt_num(p['quantity'])}  "
+                f"avg_cost={_fmt_num(p['avg_buy_price'])} {p['original_currency']}  "
+                f"price={_fmt_num(p['current_price_base'])} {base_currency}  "
+                f"value={p['current_value_base']:.2f} {base_currency}  "
+                f"P/L={p['pl_pct']:+.2f}% ({p['pl_abs']:+.2f} {base_currency})"
+                f"{stale}"
+            )
+        holdings_text = "\n".join(holdings_lines)
+        total_value = sum(p["current_value_base"] for p in enriched_portfolio)
+        total_pl = sum(p["pl_abs"] for p in enriched_portfolio)
+        num_positions = len(enriched_portfolio)
+    else:
+        holdings_text = "  (No current holdings — fresh start)"
+        total_value = 0.0
+        total_pl = 0.0
+        num_positions = 0
+
+    budget_text = (
+        f"  Additional cash budget: {budget:,.2f} {base_currency} (available for new purchases)"
+        if budget > 0
+        else f"  Additional cash budget: none (rebalance within existing holdings only)"
+    )
+
+    return f"""
+PORTFOLIO SNAPSHOT
+==================
+Risk Profile      : {risk_profile}
+Target Industries : {industries or 'No preference'}
+Target Countries  : {countries or 'No preference'}
+Asset Types       : {asset_types or 'No preference'}
+Base Currency     : {base_currency}
+
+CURRENT HOLDINGS ({num_positions} position(s)):
+{holdings_text}
+
+SUMMARY:
+  Total Portfolio Value : {total_value:,.2f} {base_currency}
+  Total Unrealised P/L  : {total_pl:+,.2f} {base_currency}
+
+BUDGET:
+{budget_text}
+""".strip()
+
 _ALL_MODELS = [
     "gemini-2.5-flash",
     "gemini-2.5-flash-lite",
@@ -347,55 +408,16 @@ def get_optimizer_recommendation(
         )
 
     # --- Build situation report -------------------------------------------
-    if enriched_portfolio:
-        holdings_lines = []
-        for p in enriched_portfolio:
-            stale = " [STALE — no live price]" if not p.get("fetch_ok") else ""
-            company = p.get("company_name") or p["ticker"]
-            holdings_lines.append(
-                f"  • {company} ({p['ticker']})  "
-                f"qty={_fmt_num(p['quantity'])}  "
-                f"avg_cost={_fmt_num(p['avg_buy_price'])} {p['original_currency']}  "
-                f"price={_fmt_num(p['current_price_base'])} {base_currency}  "
-                f"value={p['current_value_base']:.2f} {base_currency}  "
-                f"P/L={p['pl_pct']:+.2f}% ({p['pl_abs']:+.2f} {base_currency})"
-                f"{stale}"
-            )
-        holdings_text = "\n".join(holdings_lines)
-        total_value = sum(p["current_value_base"] for p in enriched_portfolio)
-        total_pl = sum(p["pl_abs"] for p in enriched_portfolio)
-        num_positions = len(enriched_portfolio)
-    else:
-        holdings_text = "  (No current holdings — fresh start)"
-        total_value = 0.0
-        total_pl = 0.0
-        num_positions = 0
-
-    budget_text = (
-        f"  Additional cash budget: {budget:,.2f} {base_currency} (available for new purchases)"
-        if budget > 0
-        else f"  Additional cash budget: none (rebalance within existing holdings only)"
+    num_positions = len(enriched_portfolio)
+    situation_report = build_situation_report(
+        enriched_portfolio=enriched_portfolio,
+        industries=industries,
+        budget=budget,
+        base_currency=base_currency,
+        countries=countries,
+        asset_types=asset_types,
+        risk_profile=risk_profile,
     )
-
-    situation_report = f"""
-PORTFOLIO SNAPSHOT
-==================
-Risk Profile      : {risk_profile}
-Target Industries : {industries or 'No preference'}
-Target Countries  : {countries or 'No preference'}
-Asset Types       : {asset_types or 'No preference'}
-Base Currency     : {base_currency}
-
-CURRENT HOLDINGS ({num_positions} position(s)):
-{holdings_text}
-
-SUMMARY:
-  Total Portfolio Value : {total_value:,.2f} {base_currency}
-  Total Unrealised P/L  : {total_pl:+,.2f} {base_currency}
-
-BUDGET:
-{budget_text}
-""".strip()
 
     asset_types_clause = (
         f"Preferred asset types are: {asset_types}. Respect this when choosing what to buy or suggest — "
@@ -502,3 +524,65 @@ BUDGET:
         lines.append(f"\nRetry in ~{delay_match.group(1)} seconds.")
 
     return "\n".join(lines)
+
+
+# ---------------------------------------------------------------------------
+# Follow-up chat about a recommendation
+# ---------------------------------------------------------------------------
+
+def chat_about_recommendation(
+    situation_report: str,
+    initial_recommendation: str,
+    chat_history: list[dict],
+    user_message: str,
+    preferred_model: str = "gemini-2.5-flash",
+) -> str:
+    """
+    Continue a conversation about the portfolio recommendation.
+
+    chat_history: list of {"role": "user"|"model", "text": "..."} (past exchanges)
+    Returns the model's reply text (or an error string).
+    """
+    if not _GEMINI_API_KEY:
+        return "GEMINI_API_KEY not set."
+
+    system_instruction = (
+        "You are a financial analyst who just provided a portfolio recommendation. "
+        "The investor may disagree with specific parts or want targeted adjustments. "
+        "Be concise and specific — give exact share quantities and prices when suggesting changes. "
+        "Do not restart the full analysis. Focus only on what is being asked. "
+        "You have access to the original portfolio snapshot and your previous recommendation."
+    )
+
+    # Build the multi-turn conversation as a list of Content objects.
+    # Seed with the original analysis exchange so the model has full context.
+    contents: list = [
+        types.Content(role="user",  parts=[types.Part(text=situation_report)]),
+        types.Content(role="model", parts=[types.Part(text=initial_recommendation)]),
+    ]
+    for msg in chat_history:
+        contents.append(
+            types.Content(role=msg["role"], parts=[types.Part(text=msg["text"])])
+        )
+    contents.append(types.Content(role="user", parts=[types.Part(text=user_message)]))
+
+    models_to_try = [preferred_model] + [m for m in _ALL_MODELS if m != preferred_model]
+    client = _client()
+
+    for model_name in models_to_try:
+        try:
+            response = client.models.generate_content(
+                model=model_name,
+                contents=contents,
+                config=types.GenerateContentConfig(
+                    system_instruction=system_instruction,
+                ),
+            )
+            return response.text
+        except Exception as exc:
+            err = str(exc)
+            if "429" in err or "404" in err:
+                continue
+            return f"Error: {exc}"
+
+    return "All models failed. Please try again later."
