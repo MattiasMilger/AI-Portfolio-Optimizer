@@ -1,0 +1,24 @@
+# Secret keys — never commit
+.env
+
+# Saved defaults and generated reports (user-specific, not part of the project)
+data/
+reports/
+
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+.Python
+
+# Virtual environments
+venv/
+.venv/
+env/
+
+# IDE
+.vscode/
+.idea/
+*.suo
+*.user
