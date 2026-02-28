@@ -59,21 +59,7 @@ cd "AI Portfolio Optimizer"
 pip install -r requirements.txt
 ```
 
-**3. Configure your API key**
-
-Copy the example env file and fill in your key:
-
-```bash
-cp .env.example .env
-```
-
-Then open `.env` and replace `your_key_here`:
-
-```
-GEMINI_API_KEY=your_actual_key_here
-```
-
-**4. Run the app**
+**3. Run the app**
 
 ```bash
 python main.py
@@ -83,10 +69,36 @@ python main.py
 
 ## How to use it
 
+### API Key Setup (first run only)
+
+The first time you launch the app — or any time no valid key is found — it opens the **API Key Setup** screen before anything else.
+
+**Step 1 — Get your key**
+
+Click **Open Google AI Studio ↗** to open [https://aistudio.google.com/app/apikey](https://aistudio.google.com/app/apikey) in your browser. Sign in with a Google account, create a new API key, and copy it.
+
+**Step 2 — Paste and save**
+
+Paste the key into the entry field (use the *Show* checkbox to reveal it if needed) and click **Test & Save Key**. The app contacts the Gemini API to confirm the key works, then writes it to a local `.env` file in the project folder.
+
+> **Security notice:** your API key grants access to your Google AI quota and billing account.
+> - Never share it publicly, commit it to a repository, or send it in messages.
+> - It is stored only in the local `.env` file, which is listed in `.gitignore` and will never be committed to git.
+> - Treat it like a password — if it is ever exposed, regenerate it immediately at [https://aistudio.google.com/app/apikey](https://aistudio.google.com/app/apikey).
+
+Once saved you will not see this screen again unless you delete the `.env` file. You can also return to it at any time via the **Change API Key** button on the title screen.
+
+If you prefer to set the key manually before launching, copy `.env.example` to `.env` and fill in your key — the wizard will be skipped automatically on startup.
+
+---
+
+### Wizard pages
+
 The app is a linear wizard. Each step has a **← Back** button so you can revisit any earlier step.
 
 | Step | Page | What you do |
 |------|------|-------------|
+| 0 | **API Key Setup** | First-run only — paste your Gemini key and click *Test & Save Key* |
 | 1 | **Title** | Click *Optimize Portfolio* to begin |
 | 2 | **Source** | Choose *Upload Image* (screenshot scan) or *Start from Scratch* (manual entry) |
 | 3 | **Positions** | Review, edit, add, or delete the extracted/entered positions |
@@ -187,6 +199,7 @@ AI Portfolio Optimizer/
 |-------|------|
 | `App` | Root `CTk` window; owns session state and navigation stack |
 | `WizardPage` | Base class for all pages; defines `on_show()` and `on_reset()` hooks |
+| `ApiKeyPage` | First-run API key setup; validates key against Gemini and writes to `.env` |
 | `TitlePage` | Landing screen |
 | `SourcePage` | Upload image or start from scratch |
 | `PositionsPage` | Editable position list with add/delete rows |
@@ -201,6 +214,8 @@ AI Portfolio Optimizer/
 
 | Function | Role |
 |----------|------|
+| `set_api_key()` | Updates the in-process API key after the user saves a new one via the wizard |
+| `validate_api_key()` | Tests a key against the Gemini API before saving it |
 | `enrich_portfolio()` | Adds live prices, FX-converted values, and P&L to position dicts |
 | `get_fx_rate()` | Fetches FX rate via yfinance with inverse fallback and in-process cache |
 | `scan_portfolio_image()` | Sends a PIL image to Gemini vision; parses JSON positions from the response |

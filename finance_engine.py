@@ -21,6 +21,31 @@ _fx_cache: dict[str, float] = {}
 _name_cache: dict[str, str] = {}
 
 
+def set_api_key(key: str) -> None:
+    """Update the in-process API key (call after saving a new key to .env)."""
+    global _GEMINI_API_KEY
+    _GEMINI_API_KEY = key.strip()
+
+
+def validate_api_key(key: str) -> tuple[bool, str]:
+    """
+    Test whether `key` is a working Gemini API key.
+    Returns (True, "") on success or (False, error_message) on failure.
+    """
+    key = key.strip()
+    if not key:
+        return False, "API key is empty."
+    try:
+        client = genai.Client(api_key=key)
+        # A lightweight call — just list models to confirm auth works.
+        models = list(client.models.list())
+        if not models:
+            return False, "Key accepted but no models were returned — check your project settings."
+        return True, ""
+    except Exception as exc:
+        return False, str(exc)
+
+
 def _client() -> genai.Client:
     """Return a configured Gemini client."""
     return genai.Client(api_key=_GEMINI_API_KEY)

@@ -6,6 +6,7 @@ Wizard-based, session-only (no persistence).
 import json
 import os
 import threading
+import webbrowser
 from datetime import datetime
 from tkinter import filedialog, messagebox
 
@@ -101,7 +102,7 @@ class App(ctk.CTk):
 
         self.pages: dict[str, "WizardPage"] = {}
         for PageClass in [
-            TitlePage, SourcePage, PositionsPage,
+            ApiKeyPage, TitlePage, SourcePage, PositionsPage,
             RecModePage, IndustriesPage, RiskProfilePage,
             BudgetPage, ModelPage, ResultPage,
         ]:
@@ -109,7 +110,9 @@ class App(ctk.CTk):
             page.grid(row=0, column=0, sticky="nsew")
             self.pages[PageClass.NAME] = page
 
-        self.goto("title")
+        # Start on the API key setup page if no key is configured yet.
+        start = "apikey" if not fe._GEMINI_API_KEY else "title"
+        self.goto(start)
 
     # ------------------------------------------------------------------
     # Navigation
@@ -160,6 +163,211 @@ class WizardPage(ctk.CTkFrame):
 
 
 # ---------------------------------------------------------------------------
+# Page 0 — API Key Setup  (shown only when GEMINI_API_KEY is not configured)
+# ---------------------------------------------------------------------------
+
+_ENV_FILE = os.path.join(os.path.dirname(os.path.abspath(__file__)), ".env")
+_AIKEY_URL = "https://aistudio.google.com/app/apikey"
+
+
+def _write_env_key(key: str) -> None:
+    """Write (or replace) GEMINI_API_KEY in the project .env file."""
+    lines: list[str] = []
+    if os.path.exists(_ENV_FILE):
+        with open(_ENV_FILE, encoding="utf-8") as f:
+            lines = f.readlines()
+
+    found = False
+    for i, line in enumerate(lines):
+        if line.strip().startswith("GEMINI_API_KEY"):
+            lines[i] = f"GEMINI_API_KEY={key}\n"
+            found = True
+            break
+    if not found:
+        lines.append(f"GEMINI_API_KEY={key}\n")
+
+    with open(_ENV_FILE, "w", encoding="utf-8") as f:
+        f.writelines(lines)
+
+
+class ApiKeyPage(WizardPage):
+    NAME = "apikey"
+
+    def _build(self):
+        self.grid_rowconfigure(0, weight=1)
+        self.grid_columnconfigure(0, weight=1)
+
+        outer = ctk.CTkFrame(self, fg_color="transparent")
+        outer.grid(row=0, column=0, sticky="nsew")
+        outer.grid_rowconfigure(0, weight=1)
+        outer.grid_columnconfigure(0, weight=1)
+
+        card = ctk.CTkFrame(outer, fg_color=COLOR_PANEL, corner_radius=12, width=560)
+        card.grid(row=0, column=0, padx=40, pady=40, sticky="nsew")
+        card.grid_columnconfigure(0, weight=1)
+
+        # ── Title ────────────────────────────────────────────────────────────
+        _label(card, "Gemini API Key Setup",
+               font=FONT_HEADING, anchor="center").grid(
+               row=0, column=0, pady=(32, 4), padx=32, sticky="ew")
+
+        _label(card,
+               "This app uses Google Gemini AI. You need a free API key to continue.",
+               font=FONT_SMALL, anchor="center", text_color=COLOR_MUTED,
+               wraplength=480).grid(row=1, column=0, padx=32, pady=(0, 20), sticky="ew")
+
+        # ── Step 1: get the key ───────────────────────────────────────────────
+        step1 = ctk.CTkFrame(card, fg_color=COLOR_ACCENT, corner_radius=8)
+        step1.grid(row=2, column=0, padx=32, pady=(0, 12), sticky="ew")
+        step1.grid_columnconfigure(0, weight=1)
+
+        _label(step1, "Step 1 — Get your free API key",
+               font=("Segoe UI", 12, "bold"), anchor="w").grid(
+               row=0, column=0, padx=14, pady=(12, 4), sticky="w")
+
+        link_btn = ctk.CTkButton(
+            step1,
+            text="Open Google AI Studio  ↗",
+            command=lambda: webbrowser.open(_AIKEY_URL),
+            fg_color=COLOR_BRAND, hover_color="#c73050",
+            font=FONT_BODY, width=220, height=32,
+        )
+        link_btn.grid(row=1, column=0, padx=14, pady=(0, 4), sticky="w")
+
+        _label(step1,
+               _AIKEY_URL,
+               font=FONT_SMALL, anchor="w", text_color="#aaaacc").grid(
+               row=2, column=0, padx=14, pady=(0, 12), sticky="w")
+
+        # ── Step 2: paste the key ────────────────────────────────────────────
+        step2 = ctk.CTkFrame(card, fg_color=COLOR_ACCENT, corner_radius=8)
+        step2.grid(row=3, column=0, padx=32, pady=(0, 12), sticky="ew")
+        step2.grid_columnconfigure(0, weight=1)
+
+        _label(step2, "Step 2 — Paste your key below",
+               font=("Segoe UI", 12, "bold"), anchor="w").grid(
+               row=0, column=0, columnspan=2, padx=14, pady=(12, 6), sticky="w")
+
+        entry_row = ctk.CTkFrame(step2, fg_color="transparent")
+        entry_row.grid(row=1, column=0, padx=14, pady=(0, 12), sticky="ew")
+        entry_row.grid_columnconfigure(0, weight=1)
+
+        self._key_entry = ctk.CTkEntry(
+            entry_row, placeholder_text="AIza…", show="•",
+            font=FONT_MONO, height=36,
+        )
+        self._key_entry.grid(row=0, column=0, sticky="ew", padx=(0, 8))
+
+        self._show_var = ctk.BooleanVar(value=False)
+        ctk.CTkCheckBox(
+            entry_row, text="Show", variable=self._show_var,
+            command=self._toggle_show, font=FONT_SMALL, width=60,
+        ).grid(row=0, column=1)
+
+        # ── Security warning ─────────────────────────────────────────────────
+        warn = ctk.CTkFrame(card, fg_color="#2a1a0a", corner_radius=8)
+        warn.grid(row=4, column=0, padx=32, pady=(0, 20), sticky="ew")
+        warn.grid_columnconfigure(0, weight=1)
+
+        _label(warn, "Security notice",
+               font=("Segoe UI", 11, "bold"), anchor="w",
+               text_color="#ffbb55").grid(
+               row=0, column=0, padx=14, pady=(10, 2), sticky="w")
+
+        _label(warn,
+               "Your API key grants access to your Google AI quota and billing account.\n"
+               "• Never share it publicly, commit it to a repository, or send it in messages.\n"
+               "• It is stored only in the local .env file in this project folder.\n"
+               "• Treat it like a password — if exposed, regenerate it immediately.",
+               font=FONT_SMALL, anchor="w", text_color="#ffcc88",
+               justify="left", wraplength=460).grid(
+               row=1, column=0, padx=14, pady=(0, 12), sticky="w")
+
+        # ── Feedback label ───────────────────────────────────────────────────
+        self._feedback_lbl = _label(card, "", font=FONT_SMALL, anchor="center",
+                                    text_color=COLOR_MUTED)
+        self._feedback_lbl.grid(row=5, column=0, padx=32, pady=(0, 4), sticky="ew")
+
+        # ── Buttons ──────────────────────────────────────────────────────────
+        btn_row = ctk.CTkFrame(card, fg_color="transparent")
+        btn_row.grid(row=6, column=0, padx=32, pady=(0, 32), sticky="ew")
+        btn_row.grid_columnconfigure(0, weight=1)
+
+        self._save_btn = _btn(
+            btn_row, "Test & Save Key",
+            command=self._test_and_save,
+            width=180, fg_color=COLOR_BRAND, hover_color="#c73050",
+        )
+        self._save_btn.grid(row=0, column=0)
+
+        # "Skip" for users who already set the key via .env manually but the
+        # module-level var wasn't populated (edge case: they edited .env and
+        # relaunched while the module cached empty).
+        _btn(btn_row, "Already set — skip",
+             command=self._skip,
+             width=160, fg_color="transparent",
+             border_width=1, border_color=COLOR_MUTED,
+             text_color=COLOR_MUTED).grid(row=0, column=1, padx=(12, 0))
+
+    # ── Helpers ───────────────────────────────────────────────────────────────
+
+    def _toggle_show(self):
+        self._key_entry.configure(show="" if self._show_var.get() else "•")
+
+    def _set_feedback(self, text: str, color: str = COLOR_MUTED):
+        self._feedback_lbl.configure(text=text, text_color=color)
+
+    def _test_and_save(self):
+        key = self._key_entry.get().strip()
+        if not key:
+            self._set_feedback("Please enter your API key.", "#ff6666")
+            return
+
+        self._save_btn.configure(state="disabled", text="Validating…")
+        self._set_feedback("Contacting Google AI…", COLOR_MUTED)
+
+        def _do_validate():
+            ok, err = fe.validate_api_key(key)
+            self.after(0, lambda: self._on_validate_done(key, ok, err))
+
+        threading.Thread(target=_do_validate, daemon=True).start()
+
+    def _on_validate_done(self, key: str, ok: bool, err: str):
+        self._save_btn.configure(state="normal", text="Test & Save Key")
+        if not ok:
+            self._set_feedback(f"Invalid key: {err[:120]}", "#ff6666")
+            return
+
+        try:
+            _write_env_key(key)
+        except Exception as exc:
+            self._set_feedback(f"Could not write .env: {exc}", "#ff6666")
+            return
+
+        fe.set_api_key(key)
+        self._set_feedback("Key saved successfully!", "#55cc88")
+        self.after(800, lambda: self.app.goto("title"))
+
+    def _skip(self):
+        """Reload from .env and navigate to title (for users who set the key manually)."""
+        from dotenv import load_dotenv as _ld
+        _ld(dotenv_path=_ENV_FILE, override=True)
+        key = os.getenv("GEMINI_API_KEY", "")
+        if key:
+            fe.set_api_key(key)
+            self.app.goto("title")
+        else:
+            self._set_feedback(
+                "No key found in .env either. Please enter your key above.", "#ff6666"
+            )
+
+    def on_reset(self):
+        self._key_entry.delete(0, "end")
+        self._set_feedback("")
+        self._save_btn.configure(state="normal", text="Test & Save Key")
+
+
+# ---------------------------------------------------------------------------
 # Page 1 — Title
 # ---------------------------------------------------------------------------
 
@@ -186,6 +394,14 @@ class TitlePage(WizardPage):
              width=220,
              fg_color=COLOR_BRAND,
              hover_color="#c73050").pack()
+
+        _btn(center, "Change API Key",
+             command=lambda: self.app.goto("apikey"),
+             width=140,
+             fg_color="transparent",
+             border_width=1,
+             border_color=COLOR_MUTED,
+             text_color=COLOR_MUTED).pack(pady=(16, 0))
 
 
 # ---------------------------------------------------------------------------
