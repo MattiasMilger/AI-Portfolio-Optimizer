@@ -6,7 +6,7 @@ A desktop application that walks you through a guided wizard to analyse your sto
 
 ## What is this?
 
-AI Portfolio Optimizer is a streamlined, session-based tool for retail investors who want a second opinion on their portfolio. You feed it your holdings — either by uploading a screenshot or entering them manually — set your preferences, and receive a structured recommendation from a large language model grounded in live market data.
+AI Portfolio Optimizer is a streamlined, session-based tool for retail investors who want a second opinion on their portfolio. You feed it your holdings - either by uploading a screenshot or entering them manually - set your preferences, and receive a structured recommendation from a large language model grounded in live market data.
 
 Every session starts from scratch. There is no account, no login, and no cloud sync. Your portfolio data never leaves your machine except for the anonymised prompt sent to the Gemini API.
 
@@ -71,24 +71,24 @@ python main.py
 
 ### API Key Setup (first run only)
 
-The first time you launch the app — or any time no valid key is found — it opens the **API Key Setup** screen before anything else.
+The first time you launch the app - or any time no valid key is found - it opens the **API Key Setup** screen before anything else.
 
-**Step 1 — Get your key**
+**Step 1 - Get your key**
 
 Click **Open Google AI Studio ↗** to open [https://aistudio.google.com/app/apikey](https://aistudio.google.com/app/apikey) in your browser. Sign in with a Google account, create a new API key, and copy it.
 
-**Step 2 — Paste and save**
+**Step 2 - Paste and save**
 
 Paste the key into the entry field (use the *Show* checkbox to reveal it if needed) and click **Test & Save Key**. The app contacts the Gemini API to confirm the key works, then writes it to a local `.env` file in the project folder.
 
 > **Security notice:** your API key grants access to your Google AI quota and billing account.
 > - Never share it publicly, commit it to a repository, or send it in messages.
 > - It is stored only in the local `.env` file, which is listed in `.gitignore` and will never be committed to git.
-> - Treat it like a password — if it is ever exposed, regenerate it immediately at [https://aistudio.google.com/app/apikey](https://aistudio.google.com/app/apikey).
+> - Treat it like a password - if it is ever exposed, regenerate it immediately at [https://aistudio.google.com/app/apikey](https://aistudio.google.com/app/apikey).
 
 Once saved you will not see this screen again unless you delete the `.env` file. You can also return to it at any time via the **Change API Key** button on the title screen.
 
-If you prefer to set the key manually before launching, copy `.env.example` to `.env` and fill in your key — the wizard will be skipped automatically on startup.
+If you prefer to set the key manually before launching, copy `.env.example` to `.env` and fill in your key - the wizard will be skipped automatically on startup.
 
 ---
 
@@ -98,7 +98,7 @@ The app is a linear wizard. Each step has a **← Back** button so you can revis
 
 | Step | Page | What you do |
 |------|------|-------------|
-| 0 | **API Key Setup** | First-run only — paste your Gemini key and click *Test & Save Key* |
+| 0 | **API Key Setup** | First-run only - paste your Gemini key and click *Test & Save Key* |
 | 1 | **Title** | Click *Optimize Portfolio* to begin |
 | 2 | **Source** | Choose *Upload Image* (screenshot scan) or *Start from Scratch* (manual entry) |
 | 3 | **Positions** | Review, edit, add, or delete the extracted/entered positions |
@@ -153,8 +153,8 @@ The scanner works best with clean, high-contrast screenshots from a brokerage ap
 
 The app is split into two modules:
 
-- **`main.py`** — all UI logic, the wizard page stack, and session state management
-- **`finance_engine.py`** — all external calls: yfinance market data, FX rates, Gemini AI (vision and text)
+- **`main.py`** - all UI logic, the wizard page stack, and session state management
+- **`finance_engine.py`** - all external calls: yfinance market data, FX rates, Gemini AI (vision and text)
 
 There is no database. Everything is held in a `session` dict on the `App` instance and discarded when the app closes or the user clicks Restart. The only file written during normal use is `data/defaults.json` (saved industries/countries preferences) and the optional `reports/` output.
 
@@ -180,7 +180,7 @@ The only data persisted between sessions is `data/defaults.json`, which stores t
 ```
 AI Portfolio Optimizer/
 │
-├── main.py                  # GUI — wizard pages and navigation
+├── main.py                  # GUI - wizard pages and navigation
 ├── finance_engine.py        # Market data (yfinance) and Gemini AI calls
 ├── requirements.txt         # Python package dependencies
 ├── .env.example             # Template for the API key

@@ -1,5 +1,5 @@
 """
-main.py — AI Portfolio Optimizer
+main.py - AI Portfolio Optimizer
 Wizard-based, session-only (no persistence).
 """
 
@@ -91,7 +91,7 @@ class App(ctk.CTk):
         self.minsize(800, 580)
         self.configure(fg_color=COLOR_BG)
 
-        # Session state — reset by restart()
+        # Session state - reset by restart()
         self.session: dict = {}
         self._history: list[str] = []
         self._current_page: str = "title"
@@ -163,7 +163,7 @@ class WizardPage(ctk.CTkFrame):
 
 
 # ---------------------------------------------------------------------------
-# Page 0 — API Key Setup  (shown only when GEMINI_API_KEY is not configured)
+# Page 0 - API Key Setup  (shown only when GEMINI_API_KEY is not configured)
 # ---------------------------------------------------------------------------
 
 _ENV_FILE = os.path.join(os.path.dirname(os.path.abspath(__file__)), ".env")
@@ -221,7 +221,7 @@ class ApiKeyPage(WizardPage):
         step1.grid(row=2, column=0, padx=32, pady=(0, 12), sticky="ew")
         step1.grid_columnconfigure(0, weight=1)
 
-        _label(step1, "Step 1 — Get your free API key",
+        _label(step1, "Step 1 - Get your free API key",
                font=("Segoe UI", 12, "bold"), anchor="w").grid(
                row=0, column=0, padx=14, pady=(12, 4), sticky="w")
 
@@ -244,7 +244,7 @@ class ApiKeyPage(WizardPage):
         step2.grid(row=3, column=0, padx=32, pady=(0, 12), sticky="ew")
         step2.grid_columnconfigure(0, weight=1)
 
-        _label(step2, "Step 2 — Paste your key below",
+        _label(step2, "Step 2 - Paste your key below",
                font=("Segoe UI", 12, "bold"), anchor="w").grid(
                row=0, column=0, columnspan=2, padx=14, pady=(12, 6), sticky="w")
 
@@ -278,7 +278,7 @@ class ApiKeyPage(WizardPage):
                "Your API key grants access to your Google AI quota and billing account.\n"
                "• Never share it publicly, commit it to a repository, or send it in messages.\n"
                "• It is stored only in the local .env file in this project folder.\n"
-               "• Treat it like a password — if exposed, regenerate it immediately.",
+               "• Treat it like a password - if exposed, regenerate it immediately.",
                font=FONT_SMALL, anchor="w", text_color="#ffcc88",
                justify="left", wraplength=460).grid(
                row=1, column=0, padx=14, pady=(0, 12), sticky="w")
@@ -303,7 +303,7 @@ class ApiKeyPage(WizardPage):
         # "Skip" for users who already set the key via .env manually but the
         # module-level var wasn't populated (edge case: they edited .env and
         # relaunched while the module cached empty).
-        _btn(btn_row, "Already set — skip",
+        _btn(btn_row, "Already set - skip",
              command=self._skip,
              width=160, fg_color="transparent",
              border_width=1, border_color=COLOR_MUTED,
@@ -368,7 +368,7 @@ class ApiKeyPage(WizardPage):
 
 
 # ---------------------------------------------------------------------------
-# Page 1 — Title
+# Page 1 - Title
 # ---------------------------------------------------------------------------
 
 class TitlePage(WizardPage):
@@ -405,7 +405,7 @@ class TitlePage(WizardPage):
 
 
 # ---------------------------------------------------------------------------
-# Page 2 — Source selection
+# Page 2 - Source selection
 # ---------------------------------------------------------------------------
 
 class SourcePage(WizardPage):
@@ -473,7 +473,7 @@ class SourcePage(WizardPage):
 
 
 # ---------------------------------------------------------------------------
-# Page 3 — Review / edit positions
+# Page 3 - Review / edit positions
 # ---------------------------------------------------------------------------
 
 class PositionsPage(WizardPage):
@@ -600,7 +600,7 @@ class _PositionRow:
 
 
 # ---------------------------------------------------------------------------
-# Page 4 — Recommend new stocks?
+# Page 4 - Recommend new stocks?
 # ---------------------------------------------------------------------------
 
 class RecModePage(WizardPage):
@@ -620,7 +620,7 @@ class RecModePage(WizardPage):
         self._var = ctk.BooleanVar(value=False)
         ctk.CTkCheckBox(
             center,
-            text="Yes — recommend new assets to add to my portfolio",
+            text="Yes - recommend new assets to add to my portfolio",
             variable=self._var, font=FONT_BODY,
         ).pack(pady=8)
 
@@ -644,7 +644,7 @@ class RecModePage(WizardPage):
 
 
 # ---------------------------------------------------------------------------
-# Page 5 — Investment preferences (industries + countries)
+# Page 5 - Investment preferences (industries + countries)
 # ---------------------------------------------------------------------------
 
 def _pref_block(parent, label_text: str, hint: str) -> tuple:
@@ -757,7 +757,7 @@ class IndustriesPage(WizardPage):
 
 
 # ---------------------------------------------------------------------------
-# Page 6 — Risk profile
+# Page 6 - Risk profile
 # ---------------------------------------------------------------------------
 
 RISK_PROFILES = ["Conservative", "Moderate", "Aggressive"]
@@ -822,7 +822,7 @@ class RiskProfilePage(WizardPage):
 
 
 # ---------------------------------------------------------------------------
-# Page 7 — Budget & currency
+# Page 7 - Budget & currency
 # ---------------------------------------------------------------------------
 
 CURRENCIES = [
@@ -893,7 +893,7 @@ class BudgetPage(WizardPage):
 
 
 # ---------------------------------------------------------------------------
-# Page 8 — AI model selection
+# Page 8 - AI model selection
 # ---------------------------------------------------------------------------
 
 class ModelPage(WizardPage):
@@ -919,7 +919,7 @@ class ModelPage(WizardPage):
                           width=220, font=FONT_BODY).grid(
             row=0, column=1, sticky="w", padx=8, pady=(20, 8))
 
-        _label(inner, "gemini-2.5-flash is the recommended default — fast and capable.",
+        _label(inner, "gemini-2.5-flash is the recommended default - fast and capable.",
                font=FONT_SMALL, text_color=COLOR_MUTED).grid(
                row=1, column=0, columnspan=2, sticky="w", padx=16, pady=(0, 20))
 
@@ -940,7 +940,7 @@ class ModelPage(WizardPage):
 
 
 # ---------------------------------------------------------------------------
-# Page 9 — Results
+# Page 9 - Results
 # ---------------------------------------------------------------------------
 
 class ResultPage(WizardPage):
@@ -1180,7 +1180,7 @@ class ResultPage(WizardPage):
 
 
 # ---------------------------------------------------------------------------
-# Helper — loading dialog shown during image scan
+# Helper - loading dialog shown during image scan
 # ---------------------------------------------------------------------------
 
 class _ProgressDialog(ctk.CTkToplevel):

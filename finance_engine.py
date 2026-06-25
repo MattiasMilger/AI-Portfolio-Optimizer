@@ -1,5 +1,5 @@
 """
-finance_engine.py — Market data (yfinance) and Gemini AI integration
+finance_engine.py - Market data (yfinance) and Gemini AI integration
 for AI Portfolio Optimizer (wizard-based, session-only, no persistence).
 """
 
@@ -37,10 +37,10 @@ def validate_api_key(key: str) -> tuple[bool, str]:
         return False, "API key is empty."
     try:
         client = genai.Client(api_key=key)
-        # A lightweight call — just list models to confirm auth works.
+        # A lightweight call - just list models to confirm auth works.
         models = list(client.models.list())
         if not models:
-            return False, "Key accepted but no models were returned — check your project settings."
+            return False, "Key accepted but no models were returned - check your project settings."
         return True, ""
     except Exception as exc:
         return False, str(exc)
@@ -250,14 +250,14 @@ def scan_portfolio_image(
 
     prompt = (
         "Extract every stock / ETF / fund position visible in this portfolio screenshot. "
-        "Return ONLY a valid JSON array — no markdown, no explanation. "
+        "Return ONLY a valid JSON array - no markdown, no explanation. "
         "Each element must have exactly these keys:\n"
-        '  "ticker"        : string  — the full yfinance ticker including exchange suffix (see rules below)\n'
-        '  "quantity"      : number  — shares / units held\n'
-        '  "avg_buy_price" : number  — average purchase price\n'
-        '  "original_currency" : string  — 3-letter currency code (e.g. "USD", "SEK")\n'
+        '  "ticker"        : string  - the full yfinance ticker including exchange suffix (see rules below)\n'
+        '  "quantity"      : number  - shares / units held\n'
+        '  "avg_buy_price" : number  - average purchase price\n'
+        '  "original_currency" : string  - 3-letter currency code (e.g. "USD", "SEK")\n'
         "Use null for any field you cannot determine with confidence.\n\n"
-        "CRITICAL — ticker exchange suffix rules (yfinance format):\n"
+        "CRITICAL - ticker exchange suffix rules (yfinance format):\n"
         "First, identify the market/exchange from the screenshot context (currency, broker name, flag, country label).\n"
         "Then append the correct suffix:\n"
         "  Sweden (SEK, Nasdaq Stockholm) → .ST   e.g. LUG → LUG.ST, ERIC-B → ERIC-B.ST\n"
@@ -342,7 +342,7 @@ def build_situation_report(
     if enriched_portfolio:
         holdings_lines = []
         for p in enriched_portfolio:
-            stale = " [STALE — no live price]" if not p.get("fetch_ok") else ""
+            stale = " [STALE - no live price]" if not p.get("fetch_ok") else ""
             company = p.get("company_name") or p["ticker"]
             holdings_lines.append(
                 f"  • {company} ({p['ticker']})  "
@@ -358,7 +358,7 @@ def build_situation_report(
         total_pl = sum(p["pl_abs"] for p in enriched_portfolio)
         num_positions = len(enriched_portfolio)
     else:
-        holdings_text = "  (No current holdings — fresh start)"
+        holdings_text = "  (No current holdings - fresh start)"
         total_value = 0.0
         total_pl = 0.0
         num_positions = 0
@@ -445,7 +445,7 @@ def get_optimizer_recommendation(
     )
 
     asset_types_clause = (
-        f"Preferred asset types are: {asset_types}. Respect this when choosing what to buy or suggest — "
+        f"Preferred asset types are: {asset_types}. Respect this when choosing what to buy or suggest - "
         "only recommend other asset types if no suitable match exists. "
         if asset_types else ""
     )
@@ -455,7 +455,7 @@ def get_optimizer_recommendation(
         "plus a ticker and one-line rationale.\n"
         if rec_new_stocks and num_positions > 0
         else (
-            f"The portfolio is empty — suggest 3-5 starter assets that fit the target industries{' and preferred asset types' if asset_types else ''}. "
+            f"The portfolio is empty - suggest 3-5 starter assets that fit the target industries{' and preferred asset types' if asset_types else ''}. "
             "Each suggestion must include a specific whole number of shares that can be purchased within the stated budget, "
             "plus a ticker and one-line rationale.\n"
             if num_positions == 0
@@ -472,11 +472,11 @@ def get_optimizer_recommendation(
         f"The investor's risk profile is {risk_profile}. "
         f"{countries_clause}"
         f"{asset_types_clause}"
-        "Use ONLY the signals SELL, BUY, and HOLD — never 'add', 'reduce', or any other word. "
+        "Use ONLY the signals SELL, BUY, and HOLD - never 'add', 'reduce', or any other word. "
         "Be balanced: default to HOLD unless there is a concrete, specific reason to act. "
-        "If you recommend a SELL, use the proceeds for a BUY of a DIFFERENT security — "
+        "If you recommend a SELL, use the proceeds for a BUY of a DIFFERENT security - "
         "never sell a position only to rebuy the same ticker. "
-        "For every SELL and BUY you must state a specific whole number of shares — "
+        "For every SELL and BUY you must state a specific whole number of shares - "
         "calculate it from the prices and budget in the report. "
         "Never use vague language like 'some', 'a portion', 'a few', or a range. "
         "The total cost of all BUYs must not exceed the sum of all SELL proceeds plus the additional cash budget. "
@@ -484,9 +484,9 @@ def get_optimizer_recommendation(
         f"{new_stocks_section}"
         "End your response with exactly this block (in this order): "
         "all SELLs first, then all BUYs, then all HOLDs, then the CASH FLOW SUMMARY, then the rationale paragraph. "
-        "Each SELL line must include the price per share, total proceeds, and end with ' — reason'. "
-        "Each BUY line must include the price per share, total cost, and end with ' — reason'. "
-        "Every position not being sold must appear as a HOLD line — never list a ticker without the Hold keyword. "
+        "Each SELL line must include the price per share, total proceeds, and end with ' - reason'. "
+        "Each BUY line must include the price per share, total cost, and end with ' - reason'. "
+        "Every position not being sold must appear as a HOLD line - never list a ticker without the Hold keyword. "
         "HOLD lines have no price or reason. "
         "Use the full company name exactly as in the holdings data. "
         "After all SELL/BUY/HOLD lines, add a CASH FLOW SUMMARY block showing: "
@@ -495,8 +495,8 @@ def get_optimizer_recommendation(
         f"All monetary values must be in {base_currency}.\n\n"
         "MY RECOMMENDATION\n"
         "-----------------\n"
-        f"Sell 3 share(s) of Full Company Name (TICKER) @ 150.00 {base_currency}/share = 450.00 {base_currency} proceeds — reason\n"
-        f"Buy 5 share(s) of Full Company Name (TICKER) @ 90.00 {base_currency}/share = 450.00 {base_currency} cost — reason\n"
+        f"Sell 3 share(s) of Full Company Name (TICKER) @ 150.00 {base_currency}/share = 450.00 {base_currency} proceeds - reason\n"
+        f"Buy 5 share(s) of Full Company Name (TICKER) @ 90.00 {base_currency}/share = 450.00 {base_currency} cost - reason\n"
         "Hold Full Company Name (TICKER)\n\n"
         "CASH FLOW SUMMARY\n"
         "-----------------\n"
@@ -574,7 +574,7 @@ def chat_about_recommendation(
     system_instruction = (
         "You are a financial analyst who just provided a portfolio recommendation. "
         "The investor may disagree with specific parts or want targeted adjustments. "
-        "Be concise and specific — give exact share quantities and prices when suggesting changes. "
+        "Be concise and specific - give exact share quantities and prices when suggesting changes. "
         "Do not restart the full analysis. Focus only on what is being asked. "
         "You have access to the original portfolio snapshot and your previous recommendation."
     )
