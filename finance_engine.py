@@ -19,6 +19,7 @@ _GEMINI_API_KEY: str = os.getenv("GEMINI_API_KEY", "")
 # Simple in-process caches to avoid redundant network calls in a single session
 _fx_cache: dict[str, float] = {}
 _name_cache: dict[str, str] = {}
+_quote_type_cache: dict[str, str] = {}
 
 
 def set_api_key(key: str) -> None:
@@ -119,6 +120,46 @@ def get_current_price(ticker: str) -> Optional[float]:
     return None
 
 
+# Simple in-process cache for fund/ETF top-holdings lookups
+_holdings_cache: dict[str, list[dict]] = {}
+
+
+def get_fund_top_holdings(ticker: str, t_obj: Optional[yf.Ticker] = None, limit: int = 10) -> list[dict]:
+    """
+    Return the top underlying holdings for an ETF or mutual fund ticker via yfinance.
+    Each item is {"symbol": str, "name": str, "weight_pct": float}.
+    Returns [] for ordinary equities or when the data isn't available -
+    yfinance only exposes this for fund-type instruments (ETFs / mutual funds).
+    Plain equity "holding companies" (e.g. Investor AB, Berkshire Hathaway) are
+    NOT covered here; those are handled via the AI's own knowledge in the prompt.
+    """
+    if ticker in _holdings_cache:
+        return _holdings_cache[ticker]
+
+    result: list[dict] = []
+    try:
+        t = t_obj or yf.Ticker(ticker)
+        funds_data = getattr(t, "funds_data", None)
+        if funds_data is not None:
+            df = getattr(funds_data, "top_holdings", None)
+            if df is not None and not df.empty:
+                for symbol, row in df.head(limit).iterrows():
+                    name = row.get("Name", symbol) if hasattr(row, "get") else symbol
+                    weight = row.get("Holding Percent", None) if hasattr(row, "get") else None
+                    result.append(
+                        {
+                            "symbol": str(symbol),
+                            "name": str(name),
+                            "weight_pct": round(float(weight) * 100, 2) if weight is not None else None,
+                        }
+                    )
+    except Exception:
+        result = []
+
+    _holdings_cache[ticker] = result
+    return result
+
+
 # ---------------------------------------------------------------------------
 # Portfolio enrichment
 # ---------------------------------------------------------------------------
@@ -165,9 +206,18 @@ def enrich_portfolio(portfolio: list[dict], base_currency: str) -> list[dict]:
                 _name_cache[ticker] = (
                     info.get("shortName") or info.get("longName") or ticker
                 )
+                _quote_type_cache[ticker] = (info.get("quoteType") or "").upper()
             except Exception:
                 _name_cache[ticker] = ticker
+                _quote_type_cache[ticker] = ""
         company_name = _name_cache[ticker]
+        quote_type = _quote_type_cache.get(ticker, "")
+
+        # For ETFs / mutual funds, pull the top underlying holdings so the AI
+        # can flag overlap with the investor's other individual positions.
+        top_holdings: list[dict] = []
+        if quote_type in ("ETF", "MUTUALFUND"):
+            top_holdings = get_fund_top_holdings(ticker, t_obj=t_obj)
 
         fx_key = f"{orig_currency}{base}"
         fx_rate = fx_rates.get(fx_key, 1.0) if orig_currency != base else 1.0
@@ -196,6 +246,8 @@ def enrich_portfolio(portfolio: list[dict], base_currency: str) -> list[dict]:
                 "pl_pct": pl_pct,
                 "fx_rate": fx_rate,
                 "fetch_ok": fetch_ok,
+                "quote_type": quote_type,
+                "top_holdings": top_holdings,
             }
         )
 
@@ -344,8 +396,10 @@ def build_situation_report(
         for p in enriched_portfolio:
             stale = " [STALE - no live price]" if not p.get("fetch_ok") else ""
             company = p.get("company_name") or p["ticker"]
+            quote_type = p.get("quote_type") or ""
+            type_tag = f" [{quote_type}]" if quote_type in ("ETF", "MUTUALFUND") else ""
             holdings_lines.append(
-                f"  • {company} ({p['ticker']})  "
+                f"  • {company} ({p['ticker']}){type_tag}  "
                 f"qty={_fmt_num(p['quantity'])}  "
                 f"avg_cost={_fmt_num(p['avg_buy_price'])} {p['original_currency']}  "
                 f"price={_fmt_num(p['current_price_base'])} {base_currency}  "
@@ -353,6 +407,15 @@ def build_situation_report(
                 f"P/L={p['pl_pct']:+.2f}% ({p['pl_abs']:+.2f} {base_currency})"
                 f"{stale}"
             )
+            top_holdings = p.get("top_holdings") or []
+            if top_holdings:
+                parts = []
+                for h in top_holdings:
+                    pct = f" {h['weight_pct']:.1f}%" if h.get("weight_pct") is not None else ""
+                    parts.append(f"{h['name']} ({h['symbol']}){pct}")
+                holdings_lines.append(
+                    f"      ↳ Top underlying holdings: " + ", ".join(parts)
+                )
         holdings_text = "\n".join(holdings_lines)
         total_value = sum(p["current_value_base"] for p in enriched_portfolio)
         total_pl = sum(p["pl_abs"] for p in enriched_portfolio)
@@ -467,11 +530,24 @@ def get_optimizer_recommendation(
         f"Prefer assets listed or headquartered in: {countries}. "
         if countries else ""
     )
+    diversification_clause = (
+        "DIVERSIFICATION LOOK-THROUGH: Some holdings are themselves diversified vehicles rather than "
+        "single-company bets - investment/holding companies (e.g. Investor AB, Industrivarden, Kinnevik, "
+        "Berkshire Hathaway) and funds/ETFs. For positions tagged [ETF] or [MUTUALFUND] in the report, "
+        "their top underlying holdings are listed - cross-reference these against the investor's other "
+        "individual stock positions. For plain-equity holding/investment companies (no tag, but you "
+        "recognise them as such from your own knowledge), use what you know of their major underlying "
+        "stakes for the same purpose. Explicitly call out any meaningful redundancy you find (e.g. "
+        "directly owning a stock that a held investment company or fund is already heavily exposed to) "
+        "in your rationale, and let it inform your SELL/BUY choices in favour of genuine diversification - "
+        "but only surface real, material overlaps, not speculative ones. "
+    )
     system_instruction = (
         "You are a financial analyst. "
         f"The investor's risk profile is {risk_profile}. "
         f"{countries_clause}"
         f"{asset_types_clause}"
+        f"{diversification_clause}"
         "Use ONLY the signals SELL, BUY, and HOLD - never 'add', 'reduce', or any other word. "
         "Be balanced: default to HOLD unless there is a concrete, specific reason to act. "
         "If you recommend a SELL, use the proceeds for a BUY of a DIFFERENT security - "
