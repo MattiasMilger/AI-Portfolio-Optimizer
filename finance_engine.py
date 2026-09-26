@@ -552,6 +552,12 @@ def get_optimizer_recommendation(
         "Be balanced: default to HOLD unless there is a concrete, specific reason to act. "
         "If you recommend a SELL, use the proceeds for a BUY of a DIFFERENT security - "
         "never sell a position only to rebuy the same ticker. "
+        + (
+            "Every BUY must be a security already present in the current holdings listed above - "
+            "you are NOT authorised to introduce any ticker that is not already held. "
+            if not (rec_new_stocks and num_positions > 0) and num_positions > 0
+            else ""
+        ) +
         "For every SELL and BUY you must state a specific whole number of shares - "
         "calculate it from the prices and budget in the report. "
         "Never use vague language like 'some', 'a portion', 'a few', or a range. "
