@@ -16,22 +16,85 @@ import finance_engine as fe
 
 # ---------------------------------------------------------------------------
 # App-wide appearance
+# Same tokens as the web apps' dark theme: dark grey background, a container
+# card, lighter inner boxes, and a green accent. Arial everywhere.
 # ---------------------------------------------------------------------------
 ctk.set_appearance_mode("dark")
 ctk.set_default_color_theme("blue")
 
-FONT_TITLE   = ("Segoe UI", 28, "bold")
-FONT_HEADING = ("Segoe UI", 16, "bold")
-FONT_BODY    = ("Segoe UI", 13)
-FONT_SMALL   = ("Segoe UI", 11)
+FONT_TITLE   = ("Arial", 28, "bold")
+FONT_SUBTITLE = ("Arial", 15)
+FONT_HEADING = ("Arial", 16, "bold")
+FONT_BODY    = ("Arial", 13)
+FONT_BTN     = ("Arial", 13, "bold")
+FONT_SMALL   = ("Arial", 11)
 FONT_MONO    = ("Consolas", 12)
 
-COLOR_BG     = "#1a1a2e"
-COLOR_PANEL  = "#16213e"
-COLOR_ACCENT = "#0f3460"
-COLOR_BRAND  = "#e94560"
-COLOR_TEXT   = "#eaeaea"
-COLOR_MUTED  = "#888888"
+COLOR_BG           = "#1e1e1e"   # window background
+COLOR_PANEL        = "#2d2d30"   # the main container card
+COLOR_ENTRY        = "#3c3c3c"   # boxes inside the container
+COLOR_BORDER       = "#444444"   # borders and dividers
+COLOR_BUTTON       = "#505050"   # secondary buttons
+COLOR_BUTTON_HOVER = "#5a5a5a"
+COLOR_BRAND        = "#2ecc71"   # accent: title, primary buttons, checks
+COLOR_BRAND_HOVER  = "#25a35a"
+COLOR_TEXT         = "#ffffff"
+COLOR_MUTED        = "#b0bec5"   # secondary text
+COLOR_DISABLED     = "#808080"
+COLOR_ERR          = "#e74c3c"   # error text
+COLOR_DANGER       = "#c0392b"   # danger buttons
+COLOR_DANGER_HOVER = "#9a2e22"
+COLOR_WARN         = "#f1c40f"
+COLOR_WARN_BG      = "#302703"
+COLOR_SUCCESS      = "#27ae60"
+
+
+def _apply_theme() -> None:
+    """Point customtkinter's default widget colours at the palette above, so every
+    widget matches without each one needing colour arguments."""
+    theme = ctk.ThemeManager.theme
+
+    def setv(widget: str, **kw) -> None:
+        d = theme.get(widget)
+        if d is None:
+            return
+        for key, val in kw.items():
+            if key not in d:
+                continue
+            d[key] = [val, val] if isinstance(d[key], (list, tuple)) else val
+
+    setv("CTk", fg_color=COLOR_BG)
+    setv("CTkToplevel", fg_color=COLOR_PANEL)
+    setv("CTkFrame", fg_color=COLOR_ENTRY, top_fg_color=COLOR_PANEL,
+         border_color=COLOR_BORDER, corner_radius=6)
+    setv("CTkLabel", text_color=COLOR_TEXT)
+    setv("CTkButton", corner_radius=4, border_width=0, fg_color=COLOR_BUTTON,
+         hover_color=COLOR_BUTTON_HOVER, border_color=COLOR_BORDER,
+         text_color=COLOR_TEXT, text_color_disabled=COLOR_DISABLED)
+    setv("CTkEntry", corner_radius=4, border_width=1, fg_color=COLOR_PANEL,
+         border_color=COLOR_BORDER, text_color=COLOR_TEXT,
+         placeholder_text_color=COLOR_DISABLED)
+    setv("CTkTextbox", corner_radius=4, border_width=1, fg_color=COLOR_PANEL,
+         border_color=COLOR_BORDER, text_color=COLOR_TEXT,
+         scrollbar_button_color=COLOR_BUTTON, scrollbar_button_hover_color=COLOR_BUTTON_HOVER)
+    setv("CTkScrollbar", button_color=COLOR_BUTTON, button_hover_color=COLOR_BUTTON_HOVER)
+    setv("CTkCheckBox", fg_color=COLOR_BRAND, hover_color=COLOR_BRAND_HOVER,
+         border_color=COLOR_DISABLED, checkmark_color=COLOR_TEXT, text_color=COLOR_TEXT,
+         text_color_disabled=COLOR_DISABLED)
+    setv("CTkRadioButton", fg_color=COLOR_BRAND, hover_color=COLOR_BRAND_HOVER,
+         border_color=COLOR_DISABLED, text_color=COLOR_TEXT, text_color_disabled=COLOR_DISABLED)
+    setv("CTkComboBox", corner_radius=4, fg_color=COLOR_PANEL, border_color=COLOR_BORDER,
+         button_color=COLOR_BUTTON, button_hover_color=COLOR_BUTTON_HOVER, text_color=COLOR_TEXT,
+         dropdown_fg_color=COLOR_ENTRY, dropdown_hover_color=COLOR_BUTTON_HOVER,
+         dropdown_text_color=COLOR_TEXT)
+    setv("CTkOptionMenu", corner_radius=4, fg_color=COLOR_BUTTON, button_color=COLOR_BUTTON_HOVER,
+         button_hover_color="#666666", text_color=COLOR_TEXT,
+         dropdown_fg_color=COLOR_ENTRY, dropdown_hover_color=COLOR_BUTTON_HOVER,
+         dropdown_text_color=COLOR_TEXT)
+    setv("DropdownMenu", fg_color=COLOR_ENTRY, hover_color=COLOR_BUTTON_HOVER, text_color=COLOR_TEXT)
+
+
+_apply_theme()
 
 # ---------------------------------------------------------------------------
 # Persistent defaults (industries only)
@@ -60,10 +123,10 @@ def _save_defaults(data: dict) -> None:
 
 def _btn(parent, text, command, width=160, **kw):
     """Create a CTkButton. Pass any CTkButton kwarg directly (e.g. fg_color, hover_color)."""
-    kw.setdefault("fg_color",    COLOR_ACCENT)
-    kw.setdefault("hover_color", "#1a4a8a")
+    kw.setdefault("fg_color",    COLOR_BUTTON)
+    kw.setdefault("hover_color", COLOR_BUTTON_HOVER)
     return ctk.CTkButton(
-        parent, text=text, command=command, width=width, font=FONT_BODY, **kw,
+        parent, text=text, command=command, width=width, font=FONT_BTN, **kw,
     )
 
 
@@ -87,8 +150,8 @@ class App(ctk.CTk):
     def __init__(self):
         super().__init__()
         self.title("AI Portfolio Optimizer")
-        self.geometry("900x660")
-        self.minsize(800, 580)
+        self.geometry("920x780")
+        self.minsize(820, 680)
         self.configure(fg_color=COLOR_BG)
 
         # Session state - reset by restart()
@@ -96,9 +159,30 @@ class App(ctk.CTk):
         self._history: list[str] = []
         self._current_page: str = "title"
 
-        # All pages share the same grid cell; tkraise() switches between them.
         self.grid_rowconfigure(0, weight=1)
         self.grid_columnconfigure(0, weight=1)
+
+        # One container card (like the web apps) holding the header and the pages.
+        self.container = ctk.CTkFrame(self, fg_color=COLOR_PANEL, corner_radius=8)
+        self.container.grid(row=0, column=0, sticky="nsew", padx=20, pady=20)
+        self.container.grid_columnconfigure(0, weight=1)
+        self.container.grid_rowconfigure(3, weight=1)
+
+        # Header: accent title, subtitle, and the divider line under it
+        _label(self.container, "AI Portfolio Optimizer", font=FONT_TITLE,
+               anchor="center", text_color=COLOR_BRAND).grid(
+               row=0, column=0, pady=(18, 0))
+        _label(self.container, "by Mattias", font=FONT_SUBTITLE,
+               anchor="center").grid(row=1, column=0, pady=(4, 0))
+        ctk.CTkFrame(self.container, height=2, corner_radius=0,
+                     fg_color=COLOR_BORDER).grid(
+                     row=2, column=0, sticky="ew", padx=24, pady=(12, 0))
+
+        # All pages share the same grid cell; tkraise() switches between them.
+        self.body = ctk.CTkFrame(self.container, fg_color=COLOR_PANEL, corner_radius=0)
+        self.body.grid(row=3, column=0, sticky="nsew")
+        self.body.grid_rowconfigure(0, weight=1)
+        self.body.grid_columnconfigure(0, weight=1)
 
         self.pages: dict[str, "WizardPage"] = {}
         for PageClass in [
@@ -148,7 +232,7 @@ class WizardPage(ctk.CTkFrame):
     NAME = ""
 
     def __init__(self, app: App):
-        super().__init__(app, fg_color=COLOR_BG)
+        super().__init__(app.body, fg_color=COLOR_PANEL, corner_radius=0)
         self.app = app
         self._build()
 
@@ -202,59 +286,59 @@ class ApiKeyPage(WizardPage):
         outer.grid_rowconfigure(0, weight=1)
         outer.grid_columnconfigure(0, weight=1)
 
-        card = ctk.CTkFrame(outer, fg_color=COLOR_PANEL, corner_radius=12, width=560)
-        card.grid(row=0, column=0, padx=40, pady=40, sticky="nsew")
+        card = ctk.CTkFrame(outer, fg_color=COLOR_ENTRY, corner_radius=6, width=560)
+        card.grid(row=0, column=0, padx=24, pady=(16, 12), sticky="nsew")
         card.grid_columnconfigure(0, weight=1)
 
         # ── Title ────────────────────────────────────────────────────────────
         _label(card, "Gemini API Key Setup",
-               font=FONT_HEADING, anchor="center").grid(
-               row=0, column=0, pady=(32, 4), padx=32, sticky="ew")
+               font=FONT_HEADING, anchor="center", text_color=COLOR_BRAND).grid(
+               row=0, column=0, pady=(18, 4), padx=32, sticky="ew")
 
         _label(card,
                "This app uses Google Gemini AI. You need a free API key to continue.",
                font=FONT_SMALL, anchor="center", text_color=COLOR_MUTED,
-               wraplength=480).grid(row=1, column=0, padx=32, pady=(0, 20), sticky="ew")
+               wraplength=480).grid(row=1, column=0, padx=32, pady=(0, 12), sticky="ew")
 
         # ── Step 1: get the key ───────────────────────────────────────────────
-        step1 = ctk.CTkFrame(card, fg_color=COLOR_ACCENT, corner_radius=8)
-        step1.grid(row=2, column=0, padx=32, pady=(0, 12), sticky="ew")
+        step1 = ctk.CTkFrame(card, fg_color=COLOR_PANEL, corner_radius=6)
+        step1.grid(row=2, column=0, padx=32, pady=(0, 10), sticky="ew")
         step1.grid_columnconfigure(0, weight=1)
 
         _label(step1, "Step 1 - Get your free API key",
-               font=("Segoe UI", 12, "bold"), anchor="w").grid(
-               row=0, column=0, padx=14, pady=(12, 4), sticky="w")
+               font=("Arial", 12, "bold"), anchor="w").grid(
+               row=0, column=0, padx=14, pady=(10, 4), sticky="w")
 
         link_btn = ctk.CTkButton(
             step1,
             text="Open Google AI Studio  ↗",
             command=lambda: webbrowser.open(_AIKEY_URL),
-            fg_color=COLOR_BRAND, hover_color="#c73050",
-            font=FONT_BODY, width=220, height=32,
+            fg_color=COLOR_BRAND, hover_color=COLOR_BRAND_HOVER,
+            font=FONT_BTN, width=220, height=32,
         )
         link_btn.grid(row=1, column=0, padx=14, pady=(0, 4), sticky="w")
 
         _label(step1,
                _AIKEY_URL,
-               font=FONT_SMALL, anchor="w", text_color="#aaaacc").grid(
-               row=2, column=0, padx=14, pady=(0, 12), sticky="w")
+               font=FONT_SMALL, anchor="w", text_color=COLOR_MUTED).grid(
+               row=2, column=0, padx=14, pady=(0, 10), sticky="w")
 
         # ── Step 2: paste the key ────────────────────────────────────────────
-        step2 = ctk.CTkFrame(card, fg_color=COLOR_ACCENT, corner_radius=8)
-        step2.grid(row=3, column=0, padx=32, pady=(0, 12), sticky="ew")
+        step2 = ctk.CTkFrame(card, fg_color=COLOR_PANEL, corner_radius=6)
+        step2.grid(row=3, column=0, padx=32, pady=(0, 10), sticky="ew")
         step2.grid_columnconfigure(0, weight=1)
 
         _label(step2, "Step 2 - Paste your key below",
-               font=("Segoe UI", 12, "bold"), anchor="w").grid(
-               row=0, column=0, columnspan=2, padx=14, pady=(12, 6), sticky="w")
+               font=("Arial", 12, "bold"), anchor="w").grid(
+               row=0, column=0, columnspan=2, padx=14, pady=(10, 6), sticky="w")
 
         entry_row = ctk.CTkFrame(step2, fg_color="transparent")
-        entry_row.grid(row=1, column=0, padx=14, pady=(0, 12), sticky="ew")
+        entry_row.grid(row=1, column=0, padx=14, pady=(0, 10), sticky="ew")
         entry_row.grid_columnconfigure(0, weight=1)
 
         self._key_entry = ctk.CTkEntry(
             entry_row, placeholder_text="AIza…", show="•",
-            font=FONT_MONO, height=36,
+            font=FONT_MONO, height=36, fg_color=COLOR_ENTRY,
         )
         self._key_entry.grid(row=0, column=0, sticky="ew", padx=(0, 8))
 
@@ -265,23 +349,23 @@ class ApiKeyPage(WizardPage):
         ).grid(row=0, column=1)
 
         # ── Security warning ─────────────────────────────────────────────────
-        warn = ctk.CTkFrame(card, fg_color="#2a1a0a", corner_radius=8)
-        warn.grid(row=4, column=0, padx=32, pady=(0, 20), sticky="ew")
+        warn = ctk.CTkFrame(card, fg_color=COLOR_WARN_BG, corner_radius=6)
+        warn.grid(row=4, column=0, padx=32, pady=(0, 10), sticky="ew")
         warn.grid_columnconfigure(0, weight=1)
 
         _label(warn, "Security notice",
-               font=("Segoe UI", 11, "bold"), anchor="w",
-               text_color="#ffbb55").grid(
-               row=0, column=0, padx=14, pady=(10, 2), sticky="w")
+               font=("Arial", 11, "bold"), anchor="w",
+               text_color=COLOR_WARN).grid(
+               row=0, column=0, padx=14, pady=(8, 2), sticky="w")
 
         _label(warn,
                "Your API key grants access to your Google AI quota and billing account.\n"
                "• Never share it publicly, commit it to a repository, or send it in messages.\n"
                "• It is stored only in the local .env file in this project folder.\n"
                "• Treat it like a password - if exposed, regenerate it immediately.",
-               font=FONT_SMALL, anchor="w", text_color="#ffcc88",
+               font=FONT_SMALL, anchor="w", text_color=COLOR_WARN,
                justify="left", wraplength=460).grid(
-               row=1, column=0, padx=14, pady=(0, 12), sticky="w")
+               row=1, column=0, padx=14, pady=(0, 10), sticky="w")
 
         # ── Feedback label ───────────────────────────────────────────────────
         self._feedback_lbl = _label(card, "", font=FONT_SMALL, anchor="center",
@@ -290,13 +374,13 @@ class ApiKeyPage(WizardPage):
 
         # ── Buttons ──────────────────────────────────────────────────────────
         btn_row = ctk.CTkFrame(card, fg_color="transparent")
-        btn_row.grid(row=6, column=0, padx=32, pady=(0, 32), sticky="ew")
+        btn_row.grid(row=6, column=0, padx=32, pady=(0, 18), sticky="ew")
         btn_row.grid_columnconfigure(0, weight=1)
 
         self._save_btn = _btn(
             btn_row, "Test & Save Key",
             command=self._test_and_save,
-            width=180, fg_color=COLOR_BRAND, hover_color="#c73050",
+            width=180, fg_color=COLOR_BRAND, hover_color=COLOR_BRAND_HOVER,
         )
         self._save_btn.grid(row=0, column=0)
 
@@ -320,7 +404,7 @@ class ApiKeyPage(WizardPage):
     def _test_and_save(self):
         key = self._key_entry.get().strip()
         if not key:
-            self._set_feedback("Please enter your API key.", "#ff6666")
+            self._set_feedback("Please enter your API key.", COLOR_ERR)
             return
 
         self._save_btn.configure(state="disabled", text="Validating…")
@@ -335,17 +419,17 @@ class ApiKeyPage(WizardPage):
     def _on_validate_done(self, key: str, ok: bool, err: str):
         self._save_btn.configure(state="normal", text="Test & Save Key")
         if not ok:
-            self._set_feedback(f"Invalid key: {err[:120]}", "#ff6666")
+            self._set_feedback(f"Invalid key: {err[:120]}", COLOR_ERR)
             return
 
         try:
             _write_env_key(key)
         except Exception as exc:
-            self._set_feedback(f"Could not write .env: {exc}", "#ff6666")
+            self._set_feedback(f"Could not write .env: {exc}", COLOR_ERR)
             return
 
         fe.set_api_key(key)
-        self._set_feedback("Key saved successfully!", "#55cc88")
+        self._set_feedback("Key saved successfully!", COLOR_BRAND)
         self.after(800, lambda: self.app.goto("title"))
 
     def _skip(self):
@@ -358,7 +442,7 @@ class ApiKeyPage(WizardPage):
             self.app.goto("title")
         else:
             self._set_feedback(
-                "No key found in .env either. Please enter your key above.", "#ff6666"
+                "No key found in .env either. Please enter your key above.", COLOR_ERR
             )
 
     def on_reset(self):
@@ -378,22 +462,15 @@ class TitlePage(WizardPage):
         self.grid_rowconfigure(0, weight=1)
         self.grid_columnconfigure(0, weight=1)
 
+        # The app title and "by Mattias" now live in the header shown on every page.
         center = ctk.CTkFrame(self, fg_color="transparent")
         center.grid(row=0, column=0)
-
-        _label(center, "AI Portfolio Optimizer",
-               font=("Segoe UI", 36, "bold"), anchor="center",
-               text_color=COLOR_BRAND).pack(pady=(0, 6))
-
-        _label(center, "By Mattias Milger",
-               font=FONT_SMALL, anchor="center",
-               text_color=COLOR_MUTED).pack(pady=(0, 48))
 
         _btn(center, "Optimize Portfolio  →",
              command=lambda: self.app.goto("source"),
              width=220,
              fg_color=COLOR_BRAND,
-             hover_color="#c73050").pack()
+             hover_color=COLOR_BRAND_HOVER).pack()
 
         _btn(center, "Change API Key",
              command=lambda: self.app.goto("apikey"),
@@ -416,8 +493,8 @@ class SourcePage(WizardPage):
         self.grid_columnconfigure(0, weight=1)
 
         _label(self, "How do you want to start?",
-               font=FONT_HEADING, anchor="center").grid(
-               row=0, column=0, pady=(40, 32))
+               font=FONT_HEADING, anchor="center", text_color=COLOR_BRAND).grid(
+               row=0, column=0, pady=(28, 24))
 
         btn_frame = ctk.CTkFrame(self, fg_color="transparent")
         btn_frame.grid(row=1, column=0)
@@ -485,14 +562,15 @@ class PositionsPage(WizardPage):
 
         # Header
         hdr = ctk.CTkFrame(self, fg_color="transparent")
-        hdr.grid(row=0, column=0, sticky="ew", padx=24, pady=(28, 8))
+        hdr.grid(row=0, column=0, sticky="ew", padx=24, pady=(20, 8))
         hdr.grid_columnconfigure(1, weight=1)
-        _label(hdr, "Review Positions", font=FONT_HEADING).grid(row=0, column=0, sticky="w")
+        _label(hdr, "Review Positions", font=FONT_HEADING,
+               text_color=COLOR_BRAND).grid(row=0, column=0, sticky="w")
         _btn(hdr, "+ Add Position", command=self._add_row, width=140).grid(
             row=0, column=2, sticky="e")
 
         # Scrollable list
-        self._scroll = ctk.CTkScrollableFrame(self, fg_color=COLOR_PANEL, corner_radius=8)
+        self._scroll = ctk.CTkScrollableFrame(self, fg_color=COLOR_ENTRY, corner_radius=6)
         self._scroll.grid(row=1, column=0, sticky="nsew", padx=24, pady=4)
         self._scroll.grid_columnconfigure((0, 1, 2, 3), weight=1)
 
@@ -508,7 +586,8 @@ class PositionsPage(WizardPage):
         footer.grid(row=2, column=0, sticky="ew", padx=24, pady=14)
         footer.grid_columnconfigure(1, weight=1)
         _back_btn(footer, self.app).grid(row=0, column=0, sticky="w")
-        _btn(footer, "Continue  →", command=self._continue, width=140).grid(
+        _btn(footer, "Continue  →", command=self._continue, width=140,
+             fg_color=COLOR_BRAND, hover_color=COLOR_BRAND_HOVER).grid(
             row=0, column=2, sticky="e")
 
     def on_show(self):
@@ -558,8 +637,8 @@ class _PositionRow:
         self._price  = ctk.CTkEntry(parent, width=100, font=FONT_BODY)
         self._curr   = ctk.CTkEntry(parent, width=80,  font=FONT_BODY)
         self._del    = ctk.CTkButton(parent, text="✕", width=32, height=28,
-                                     font=FONT_SMALL, fg_color="#6b2020",
-                                     hover_color="#9b3030",
+                                     font=FONT_SMALL, fg_color=COLOR_DANGER,
+                                     hover_color=COLOR_DANGER_HOVER,
                                      command=lambda: on_delete(self))
         if data:
             self._ticker.insert(0, data.get("ticker", ""))
@@ -611,8 +690,8 @@ class RecModePage(WizardPage):
         self.grid_columnconfigure(0, weight=1)
 
         _label(self, "Suggest New Assets?",
-               font=FONT_HEADING, anchor="center").grid(
-               row=0, column=0, pady=(60, 20))
+               font=FONT_HEADING, anchor="center", text_color=COLOR_BRAND).grid(
+               row=0, column=0, pady=(40, 20))
 
         center = ctk.CTkFrame(self, fg_color="transparent")
         center.grid(row=1, column=0)
@@ -632,7 +711,8 @@ class RecModePage(WizardPage):
         footer.grid(row=2, column=0, sticky="ew", padx=24, pady=24)
         footer.grid_columnconfigure(1, weight=1)
         _back_btn(footer, self.app).grid(row=0, column=0, sticky="w")
-        _btn(footer, "Continue  →", command=self._continue, width=140).grid(
+        _btn(footer, "Continue  →", command=self._continue, width=140,
+             fg_color=COLOR_BRAND, hover_color=COLOR_BRAND_HOVER).grid(
             row=0, column=2, sticky="e")
 
     def on_show(self):
@@ -652,7 +732,7 @@ def _pref_block(parent, label_text: str, hint: str) -> tuple:
     Build a labelled text-input block with a 'Save as Default' button.
     Returns (textbox_widget, save_btn_widget).
     """
-    block = ctk.CTkFrame(parent, fg_color=COLOR_PANEL, corner_radius=8)
+    block = ctk.CTkFrame(parent, fg_color=COLOR_ENTRY, corner_radius=6)
     block.pack(fill="x", padx=0, pady=(0, 12))
     block.grid_columnconfigure(0, weight=1)
 
@@ -661,10 +741,11 @@ def _pref_block(parent, label_text: str, hint: str) -> tuple:
     hdr.grid(row=0, column=0, sticky="ew", padx=12, pady=(10, 2))
     hdr.grid_columnconfigure(0, weight=1)
 
-    _label(hdr, label_text, font=FONT_BODY).grid(row=0, column=0, sticky="w")
+    _label(hdr, label_text, font=FONT_BTN, text_color=COLOR_BRAND).grid(
+        row=0, column=0, sticky="w")
 
     save_btn = _btn(hdr, "💾 Save as Default", command=lambda: None,
-                    width=150, fg_color=COLOR_ACCENT)
+                    width=150)
     save_btn.grid(row=0, column=1, sticky="e", padx=(8, 0))
 
     _label(block, hint, font=FONT_SMALL, text_color=COLOR_MUTED,
@@ -683,8 +764,9 @@ class IndustriesPage(WizardPage):
         self.grid_rowconfigure(1, weight=1)
         self.grid_columnconfigure(0, weight=1)
 
-        _label(self, "Investment Preferences", font=FONT_HEADING).grid(
-            row=0, column=0, sticky="w", padx=32, pady=(28, 8))
+        _label(self, "Investment Preferences", font=FONT_HEADING,
+               text_color=COLOR_BRAND).grid(
+            row=0, column=0, sticky="w", padx=32, pady=(20, 8))
 
         scroll = ctk.CTkScrollableFrame(self, fg_color="transparent")
         scroll.grid(row=1, column=0, sticky="nsew", padx=32, pady=4)
@@ -724,7 +806,8 @@ class IndustriesPage(WizardPage):
         footer.grid(row=2, column=0, sticky="ew", padx=24, pady=14)
         footer.grid_columnconfigure(1, weight=1)
         _back_btn(footer, self.app).grid(row=0, column=0, sticky="w")
-        _btn(footer, "Continue  →", command=self._continue, width=140).grid(
+        _btn(footer, "Continue  →", command=self._continue, width=140,
+             fg_color=COLOR_BRAND, hover_color=COLOR_BRAND_HOVER).grid(
             row=0, column=2, sticky="e")
 
     def on_show(self):
@@ -745,9 +828,9 @@ class IndustriesPage(WizardPage):
         defaults = _load_defaults()
         defaults[key] = text
         _save_defaults(defaults)
-        btn.configure(text="✓ Saved!", fg_color="#1a6b3a")
+        btn.configure(text="✓ Saved!", fg_color=COLOR_SUCCESS)
         self.after(1500, lambda: btn.configure(text="💾 Save as Default",
-                                               fg_color=COLOR_ACCENT))
+                                               fg_color=COLOR_BUTTON))
 
     def _continue(self):
         self.app.session["industries"]  = self._ind_txt.get("1.0", "end").strip()
@@ -776,10 +859,11 @@ class RiskProfilePage(WizardPage):
         self.grid_rowconfigure(1, weight=1)
         self.grid_columnconfigure(0, weight=1)
 
-        _label(self, "Risk Profile", font=FONT_HEADING).grid(
-            row=0, column=0, sticky="w", padx=32, pady=(36, 8))
+        _label(self, "Risk Profile", font=FONT_HEADING,
+               text_color=COLOR_BRAND).grid(
+            row=0, column=0, sticky="w", padx=32, pady=(24, 8))
 
-        inner = ctk.CTkFrame(self, fg_color=COLOR_PANEL, corner_radius=8)
+        inner = ctk.CTkFrame(self, fg_color=COLOR_ENTRY, corner_radius=6)
         inner.grid(row=1, column=0, sticky="ew", padx=32, pady=4)
         inner.grid_columnconfigure(0, weight=1)
 
@@ -806,7 +890,8 @@ class RiskProfilePage(WizardPage):
         footer.grid(row=2, column=0, sticky="ew", padx=24, pady=14)
         footer.grid_columnconfigure(1, weight=1)
         _back_btn(footer, self.app).grid(row=0, column=0, sticky="w")
-        _btn(footer, "Continue  →", command=self._continue, width=140).grid(
+        _btn(footer, "Continue  →", command=self._continue, width=140,
+             fg_color=COLOR_BRAND, hover_color=COLOR_BRAND_HOVER).grid(
             row=0, column=2, sticky="e")
 
     def _update_desc(self):
@@ -840,10 +925,11 @@ class BudgetPage(WizardPage):
         self.grid_rowconfigure(1, weight=1)
         self.grid_columnconfigure(0, weight=1)
 
-        _label(self, "Budget & Currency", font=FONT_HEADING).grid(
-            row=0, column=0, sticky="w", padx=32, pady=(36, 8))
+        _label(self, "Budget & Currency", font=FONT_HEADING,
+               text_color=COLOR_BRAND).grid(
+            row=0, column=0, sticky="w", padx=32, pady=(24, 8))
 
-        inner = ctk.CTkFrame(self, fg_color=COLOR_PANEL, corner_radius=8)
+        inner = ctk.CTkFrame(self, fg_color=COLOR_ENTRY, corner_radius=6)
         inner.grid(row=1, column=0, sticky="ew", padx=32, pady=4)
         inner.grid_columnconfigure(1, weight=1)
 
@@ -873,7 +959,8 @@ class BudgetPage(WizardPage):
         footer.grid(row=2, column=0, sticky="ew", padx=24, pady=14)
         footer.grid_columnconfigure(1, weight=1)
         _back_btn(footer, self.app).grid(row=0, column=0, sticky="w")
-        _btn(footer, "Continue  →", command=self._continue, width=140).grid(
+        _btn(footer, "Continue  →", command=self._continue, width=140,
+             fg_color=COLOR_BRAND, hover_color=COLOR_BRAND_HOVER).grid(
             row=0, column=2, sticky="e")
 
     def on_show(self):
@@ -903,10 +990,11 @@ class ModelPage(WizardPage):
         self.grid_rowconfigure(1, weight=1)
         self.grid_columnconfigure(0, weight=1)
 
-        _label(self, "Choose AI Model", font=FONT_HEADING).grid(
-            row=0, column=0, sticky="w", padx=32, pady=(36, 8))
+        _label(self, "Choose AI Model", font=FONT_HEADING,
+               text_color=COLOR_BRAND).grid(
+            row=0, column=0, sticky="w", padx=32, pady=(24, 8))
 
-        inner = ctk.CTkFrame(self, fg_color=COLOR_PANEL, corner_radius=8)
+        inner = ctk.CTkFrame(self, fg_color=COLOR_ENTRY, corner_radius=6)
         inner.grid(row=1, column=0, sticky="ew", padx=32, pady=4)
         inner.grid_columnconfigure(1, weight=1)
 
@@ -928,7 +1016,7 @@ class ModelPage(WizardPage):
         footer.grid_columnconfigure(1, weight=1)
         _back_btn(footer, self.app).grid(row=0, column=0, sticky="w")
         _btn(footer, "✨  Start Analysis", command=self._start,
-             width=180, fg_color=COLOR_BRAND, hover_color="#c73050").grid(
+             width=180, fg_color=COLOR_BRAND, hover_color=COLOR_BRAND_HOVER).grid(
              row=0, column=2, sticky="e")
 
     def on_show(self):
@@ -952,24 +1040,25 @@ class ResultPage(WizardPage):
 
         # --- Header ---
         hdr = ctk.CTkFrame(self, fg_color="transparent")
-        hdr.grid(row=0, column=0, sticky="ew", padx=24, pady=(20, 4))
+        hdr.grid(row=0, column=0, sticky="ew", padx=24, pady=(14, 4))
         hdr.grid_columnconfigure(1, weight=1)
-        _label(hdr, "AI Recommendation", font=FONT_HEADING).grid(row=0, column=0, sticky="w")
+        _label(hdr, "AI Recommendation", font=FONT_HEADING,
+               text_color=COLOR_BRAND).grid(row=0, column=0, sticky="w")
         self._status_lbl = _label(hdr, "", font=FONT_SMALL, text_color=COLOR_MUTED)
         self._status_lbl.grid(row=0, column=1, sticky="e", padx=8)
 
         # --- Unified conversation box (recommendation + chat in one scrollable view) ---
         self._conversation_box = ctk.CTkTextbox(
             self, font=FONT_BODY, wrap="word",
-            fg_color=COLOR_PANEL, corner_radius=8,
+            fg_color=COLOR_ENTRY, corner_radius=6,
         )
         self._conversation_box.grid(row=1, column=0, sticky="nsew", padx=24, pady=4)
         self._conversation_box.configure(state="disabled")
-        self._conversation_box._textbox.tag_configure("rec_txt",  foreground="#eaeaea", font=FONT_MONO)
-        self._conversation_box._textbox.tag_configure("user_lbl", foreground="#7eb8f7", font=("Segoe UI", 12, "bold"))
-        self._conversation_box._textbox.tag_configure("user_txt", foreground="#cce0ff")
-        self._conversation_box._textbox.tag_configure("ai_lbl",   foreground="#a8e6a3", font=("Segoe UI", 12, "bold"))
-        self._conversation_box._textbox.tag_configure("ai_txt",   foreground="#eaeaea")
+        self._conversation_box._textbox.tag_configure("rec_txt",  foreground=COLOR_TEXT, font=FONT_MONO)
+        self._conversation_box._textbox.tag_configure("user_lbl", foreground="#82b1ff", font=("Arial", 12, "bold"))
+        self._conversation_box._textbox.tag_configure("user_txt", foreground=COLOR_TEXT)
+        self._conversation_box._textbox.tag_configure("ai_lbl",   foreground=COLOR_BRAND, font=("Arial", 12, "bold"))
+        self._conversation_box._textbox.tag_configure("ai_txt",   foreground=COLOR_TEXT)
 
         # --- Chat input ---
         chat_input = ctk.CTkFrame(self, fg_color="transparent")
@@ -985,7 +1074,8 @@ class ResultPage(WizardPage):
         self._chat_entry.bind("<Return>", lambda _: self._send_chat())
         self._chat_entry.configure(state="disabled")
 
-        self._send_btn = _btn(chat_input, "Send", command=self._send_chat, width=80, state="disabled")
+        self._send_btn = _btn(chat_input, "Send", command=self._send_chat, width=80, state="disabled",
+                              fg_color=COLOR_BRAND, hover_color=COLOR_BRAND_HOVER)
         self._send_btn.grid(row=0, column=1)
 
         # --- Footer ---
@@ -1001,7 +1091,7 @@ class ResultPage(WizardPage):
         self._rethink_btn.pack(side="left", padx=(0, 8))
 
         _btn(footer, "↺  Restart", command=self.app.restart,
-             width=110, fg_color="#3a2020", hover_color="#5a3030").pack(side="right")
+             width=110, fg_color=COLOR_DANGER, hover_color=COLOR_DANGER_HOVER).pack(side="right")
 
         # Internal chat state
         self._situation_report: str = ""
