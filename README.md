@@ -229,3 +229,7 @@ AI Portfolio Optimizer/
 **Developer**: Mattias Milger  
 **Email**: mattias.r.milger@gmail.com  
 **GitHub**: [MattiasMilger](https://github.com/MattiasMilger/Vasenvaktaren)
+
+## More Projects
+
+Check out more of my work at [mattiasmilger.github.io](https://mattiasmilger.github.io/).
